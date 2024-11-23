@@ -5,7 +5,14 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 ## Current Tools
 
 - Data quality checks. See 'quality_checks' folder
+    - output screenshot:
+
+![image](https://github.com/user-attachments/assets/7b8b74a4-d09f-4d1b-8ce8-411c65275b38)
+
 - Data lineage map. See 'lineage' folder
+    - output screenshot:
+
+![image](https://github.com/user-attachments/assets/112ad9fc-01f4-4f78-a6d4-294d7244dd48)
 
 ## Contributing
 
