@@ -2,6 +2,8 @@
 
 A collection of Python tools for SQL data management, with a strong focus on simplicity, flexibility, and speed.
 
+![WatchPup](https://github.com/user-attachments/assets/b7bd7d85-6f10-4308-8467-4192032a9371)
+
 ## Current Tools
 
 - Data quality checks. See 'quality_checks' folder
