@@ -1,0 +1,5 @@
+# SQL Lineage Mapper Configuration
+
+sql_folder_path: "SQL-files"
+
+lineage_output_path_file: "output/lineage.md"
