@@ -1,0 +1,2 @@
+type: duckdb
+database_file: "mock-files/data_quality_test.duckdb"

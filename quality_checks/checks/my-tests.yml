@@ -1,0 +1,40 @@
+sandbox.users:
+  columns:
+    - name: user_id
+      tests:
+        - unique
+        - no_nulls
+        - max_len: 20
+    
+    - name: username
+      tests:
+        - no_nulls
+        - unique
+        - max_len: 20
+    
+    - name: status
+      tests:
+        - no_nulls
+        - accepted_values: ['active', 'inactive', 'pending', 'suspended']
+    
+    - name: last_login
+      tests:
+        - no_nulls
+        - no_future_dates
+
+sandbox.orders:
+  columns:
+    - name: order_id
+      tests:
+        - unique
+        - no_nulls
+    
+    - name: order_date
+      tests:
+        - no_nulls
+        - no_future_dates
+    
+    - name: amount
+      tests:
+        - no_nulls
+        - positive_amount
