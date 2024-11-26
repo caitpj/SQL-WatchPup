@@ -30,28 +30,52 @@ class SQLLineageMapper:
     def find_sql_files(self):
         return list(Path(self.root_folder).rglob('*.sql'))
     
+    def extract_ctes(self, sql_content: str) -> set:
+        """Extract CTE names from SQL content."""
+        # Match 'WITH name AS (' or ', name AS ('
+        cte_pattern = r'(?:with|,)\s+([a-zA-Z0-9_]+)\s+as\s*\('
+        ctes = set()
+        
+        # Find all CTEs in the SQL, ignoring case
+        matches = re.finditer(cte_pattern, sql_content, re.IGNORECASE)
+        for match in matches:
+            # Check if the match isn't in a comment
+            line_start = sql_content.rfind('\n', 0, match.start()) + 1
+            if line_start == 0:
+                line_start = 0
+            line_to_match = sql_content[line_start:match.start()]
+            if not line_to_match.strip().startswith('--'):
+                ctes.add(match.group(1).lower())
+                
+        return ctes
+    
     def extract_parent_tables(self, sql_content: str):
-        """Extract parent table names from SQL content using regex."""
+        """Extract parent table names from SQL content using regex, excluding CTEs."""
         parent_tables = set()
         
-        lines = sql_content.split('\n')
-        for line in lines:
-            if line.strip().startswith('--'):
-                continue
-                
-            # Find all 'from schema.table' or 'from table' patterns
-            from_matches = re.finditer(r'from\s+(([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)', line, re.IGNORECASE)
-            for match in from_matches:
-                if '--' not in line[:match.start()]:
-                    table_name = match.group(3)
-                    parent_tables.add(table_name.lower())
-            
-            # Find all 'join schema.table' or 'join table' patterns
-            join_matches = re.finditer(r'join\s+(([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)', line, re.IGNORECASE)
-            for match in join_matches:
-                if '--' not in line[:match.start()]:
-                    table_name = match.group(3)
-                    parent_tables.add(table_name.lower())
+        # First, get all CTEs to exclude them
+        ctes = self.extract_ctes(sql_content)
+        
+        # Split into lines but preserve multi-line statements
+        sql_content = ' '.join(
+            line for line in sql_content.split('\n')
+            if not line.strip().startswith('--')
+        )
+        
+        # Find all 'from schema.table' or 'from table' patterns
+        from_pattern = r'from\s+(([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)'
+        from_matches = re.finditer(from_pattern, sql_content, re.IGNORECASE)
+        
+        # Find all 'join schema.table' or 'join table' patterns
+        join_pattern = r'join\s+(([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)'
+        join_matches = re.finditer(join_pattern, sql_content, re.IGNORECASE)
+        
+        # Process matches
+        for match in list(from_matches) + list(join_matches):
+            table_name = match.group(3).lower()
+            # Only add if it's not a CTE
+            if table_name not in ctes:
+                parent_tables.add(table_name)
         
         return parent_tables
     
