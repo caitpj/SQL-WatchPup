@@ -22,7 +22,7 @@ A flexible and extensible data quality testing framework that supports multiple 
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/caitpj/SQL-WatchPup.git
 cd data-quality-framework
 ```
 
