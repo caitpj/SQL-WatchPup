@@ -6,8 +6,10 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 
 
 ## Current Tools
+1. Data quality checker
+2. Data lineage mapper 
 
-### Data quality checks 
+### 1. Data quality checker
 - A flexible and extensible data quality testing framework.
 - For more details, see README.md in the 'quality_checks' folder
 - Output screenshots:
@@ -19,7 +21,7 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 ![image](https://github.com/user-attachments/assets/0ee6d300-3221-488f-960e-a6ad42ef7933)
 
 
-### Data lineage mapper 
+### 2. Data lineage mapper 
 - A Python tool that analyzes SQL files and generates a Mermaid diagram showing table lineage.
 - For more details, see README.md in the 'lineage_mapper' folder
 - Output screenshot:
