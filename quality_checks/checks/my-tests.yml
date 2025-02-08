@@ -1,4 +1,4 @@
-sandbox.users:
+watchpup.users:
   columns:
     - name: user_id
       tests:
@@ -22,7 +22,7 @@ sandbox.users:
         - no_nulls
         - no_future_dates
 
-sandbox.orders:
+watchpup.orders:
   columns:
     - name: order_id
       tests:
@@ -35,6 +35,26 @@ sandbox.orders:
         - no_future_dates
     
     - name: amount
+      tests:
+        - no_nulls
+        - positive_amount
+
+watchpup.currencies:
+  columns:
+    - name: exchange_from_ccy
+      tests:
+        - no_nulls
+
+    - name: exchange_to_ccy
+      tests:
+        - no_nulls
+    
+    - name: reporting_date
+      tests:
+        - no_nulls
+        - no_future_dates
+    
+    - name: exchange_rate
       tests:
         - no_nulls
         - positive_amount

@@ -1,2 +1,2 @@
 select * from {{schema}}.{{table_name}}
-where {{column}} > current_date
+where {{column}} > current_date() + 1

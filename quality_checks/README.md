@@ -1,6 +1,6 @@
 # Data Quality Framework
 
-A flexible and extensible data quality testing framework that supports multiple databases (DuckDB, PostgreSQL, and Trino) and allows for custom test definitions.
+A flexible and extensible data quality testing framework that supports multiple databases (Snowflake, DuckDB, PostgreSQL, and Trino) and allows for custom test definitions.
 
 ## Features
 
@@ -12,6 +12,7 @@ A flexible and extensible data quality testing framework that supports multiple 
 - 🎯 Custom test support with Jinja templating
 - 📝 YAML-based configuration
 - 🔌 Support for multiple databases:
+  - Snowflake
   - DuckDB
   - PostgreSQL
   - Trino
@@ -42,30 +43,42 @@ custom_tests_path: "custom_tests/"
 
 ### Database Configuration (db_details.yml)
 
+Snowflake:
+```yaml
+type: "snowflake"
+user: "SNOWFLAKE_USER"
+password: "SNOWFLAKE_PASSWORD"
+account: "SNOWFLAKE_ACCOUNT"    # Example: xy12345.us-east-1
+warehouse: "SNOWFLAKE_WAREHOUSE"
+database: "SNOWFLAKE_DATABASE"
+schema: "SNOWFLAKE_SCHEMA"      # Optional, defaults to PUBLIC
+role: "SNOWFLAKE_ROLE" 
+```
+
 DuckDB:
 ```yaml
-type: duckdb
+type: "duckdb"
 database_file: "data_quality_test.duckdb"
 ```
 
 PostgreSQL:
 ```yaml
-type: postgresql
-host: localhost
-port: 5432
-database: your_database
-user: your_username
-password: your_password
+type: "postgresql"
+host: "localhost"
+port: "5432"
+database: "your_database"
+user: "your_username"
+password: "your_password"
 ```
 
 Trino:
 ```yaml
-type: trino
-host: localhost
-port: 8080
-user: your_username
-catalog: your_catalog
-schema: your_schema  # optional
+type: "trino"
+host: "localhost"
+port: "8080"
+user: "your_username"
+catalog: "your_catalog"
+schema: "your_schema"  # optional
 ```
 
 ### Table Configuration (config/tables/users.yml)
@@ -82,6 +95,7 @@ sandbox.users:
       tests:
         - no_nulls
         - accepted_values: ['active', 'inactive', 'pending']
+  ...
 ```
 
 ### Custom Tests
@@ -92,7 +106,7 @@ Create SQL files in the `custom_tests` directory:
 -- custom_tests/no_future_dates.sql
 select *
 from {{schema}}.{{table_name}}
-where {{column}} > current_date
+where {{column}} > current_date() + 1
 ```
 
 ## Usage

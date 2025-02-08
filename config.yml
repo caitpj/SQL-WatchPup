@@ -3,6 +3,6 @@ sql_folder_path: "mock-files/SQL-files"
 lineage_output_path_file: "lineage_mapper/output/lineage.md"
 
 # Quality Checks Locations
-db_config_path: "quality_checks/db_details.yml"
-table_configs_path: "quality_checks/checks/"
-custom_tests_path: "quality_checks/custom_tests/"
+db_config_path: "db_details.yml"
+table_configs_path: "checks/"
+custom_tests_path: "custom_tests/"
