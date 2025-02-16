@@ -207,6 +207,12 @@ class SnowflakeConnector(DatabaseConnector):
     def default_schema(self) -> str:
         return 'PUBLIC'
 
+def resolve_path(base_path: str, relative_path: str) -> str:
+    """Resolve a path relative to the base path."""
+    if os.path.isabs(relative_path):
+        return relative_path
+    return os.path.normpath(os.path.join(os.path.dirname(base_path), relative_path))
+
 class DataQualityFramework:
     CONNECTORS = {
         'duckdb': 'DuckDBConnector',
@@ -218,9 +224,13 @@ class DataQualityFramework:
 
     def __init__(self, main_config_path: str):
         """Initialize framework with main config path"""
+        self.script_path = os.path.abspath(__file__)
         logger.info(f"Initializing DataQualityFramework with config: {main_config_path}")
         self.main_config = self._load_yaml(main_config_path)
-        self.db_config = self._load_yaml(self.main_config['db_config_path'])
+        
+        # Resolve db_config_path relative to script location
+        db_config_path = resolve_path(self.script_path, self.main_config['db_config_path'])
+        self.db_config = self._load_yaml(db_config_path)
         self.db = self._initialize_db_connector()
         self.custom_tests = self._load_custom_tests()
         self.table_configs = self._load_table_configs()
@@ -282,7 +292,8 @@ class DataQualityFramework:
     def _load_custom_tests(self) -> dict:
         """Load custom test SQL queries from custom_tests directory."""
         custom_tests = {}
-        custom_tests_dir = self.main_config.get('custom_tests_path', 'custom_tests')
+        custom_tests_dir = resolve_path(self.script_path, 
+                                      self.main_config.get('custom_tests_path', 'custom_tests'))
         
         logger.info(f"Loading custom tests from: {custom_tests_dir}")
         
@@ -314,7 +325,7 @@ class DataQualityFramework:
     def _load_table_configs(self) -> Dict[str, dict]:
         """Load all YAML files from the specified config directory."""
         table_configs = {}
-        config_dir = self.main_config['table_configs_path']
+        config_dir = resolve_path(self.script_path, self.main_config['table_configs_path'])
         
         logger.info(f"Loading table configs from: {config_dir}")
         
