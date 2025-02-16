@@ -115,7 +115,7 @@ where {{column}} > current_date() + 1
 
 2. Run the framework:
 ```bash
-python quality_check.py
+python run_dq_checks.py
 ```
 
 ## Sample Output
@@ -144,7 +144,7 @@ sandbox.users:
 
 ## Project Structure
 ```
-data-quality-framework/
+data_quality/
 ├── config/
 │   ├── db_details.yml
 │   └── tables/
@@ -153,9 +153,10 @@ data-quality-framework/
 ├── custom_tests/
 │   ├── no_future_dates.sql
 │   └── custom_positive_amount.sql
-├── data_quality_framework.py
+├── run_dq_checks.py
 ├── main_config.yml
 ├── requirements.txt
+├── db_details.yml
 └── README.md
 ```
 

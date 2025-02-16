@@ -4,8 +4,9 @@ jinja2>=3.1.0    # For template rendering
 pandas>=2.0.0    # For data handling
 termcolor>=2.3.0 # For colored terminal output
 
-# Database drivers (comment out the ones you don't need)
-duckdb>=0.9.0    # For DuckDB
-psycopg2-binary>=2.9.0  # For PostgreSQL
-sqlalchemy>=2.0.0  # For PostgreSQL via SQLAlchemy
-trino>=0.327.0   # For Trino
+# Database drivers (uncomment the one you want)
+# duckdb>=0.9.0    # For DuckDB
+# psycopg2-binary>=2.9.0  # For PostgreSQL
+# sqlalchemy>=2.0.0  # For PostgreSQL via SQLAlchemy
+# trino>=0.327.0   # For Trino
+# snowflake-connector-python>=3.6.0   # For Snowflake

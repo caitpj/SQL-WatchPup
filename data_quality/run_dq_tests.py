@@ -578,7 +578,7 @@ def main():
         config = sys.argv[1]
     else:
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config = os.path.join(parent_dir, 'config.yml')
+        config = os.path.join(parent_dir, 'master_config.yml')
     
     logger.info(f"Starting quality checks with config file: {config}")
     
