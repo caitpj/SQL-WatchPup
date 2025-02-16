@@ -1,30 +1,22 @@
-# Data Quality Framework
+# SQL WatchPup 🐕
 
-A flexible and extensible data quality testing framework that supports multiple databases (Snowflake, DuckDB, PostgreSQL, and Trino) and allows for custom test definitions.
+A powerful and flexible data quality testing framework that makes it easy to validate your data across multiple database types. Define your tests in YAML, run them with a simple command, and get clear, visual results.
 
-## Features
+## Key Features
 
-- 🔍 Built-in test types:
-  - `no_nulls`: Check for NULL values
-  - `unique`: Verify column uniqueness
-  - `accepted_values`: Validate against a list of allowed values
-  - `max_len`: Check string length
-- 🎯 Custom test support with Jinja templating
-- 📝 YAML-based configuration
-- 🔌 Support for multiple databases:
-  - Snowflake
-  - DuckDB
-  - PostgreSQL
-  - Trino
-- 🎨 Colorful console output with visual test results
-- 📊 Detailed test summary statistics
+- 🔌 **Multi-Database Support**: Works with Snowflake, DuckDB, PostgreSQL, and Trino
+- 🧪 **Built-in Test Types**: Common validations ready to use
+- 🎯 **Custom Tests**: Add your own SQL-based tests with Jinja templating
+- 📊 **Visual Results**: Clear, color-coded output showing test results and statistics
+- 🛠️ **Flexible Configuration**: Simple YAML-based setup
+- 🎯 **Targeted Testing**: Run tests on specific tables or files as needed
 
-## Installation
+## Quick Start
 
 1. Clone the repository:
 ```bash
 git clone https://github.com/caitpj/SQL-WatchPup.git
-cd data-quality-framework
+cd SQL-WatchPup
 ```
 
 2. Install dependencies:
@@ -32,58 +24,67 @@ cd data-quality-framework
 pip install -r requirements.txt
 ```
 
+3. Set up your configurations (see Configuration section below)
+
+4. Run your tests:
+```bash
+python run_dq_tests.py
+```
+
 ## Configuration
 
-### Main Configuration (config.yml)
+The framework uses three types of configuration files:
+
+### 1. Main Configuration (`master_config.yml`)
+This is your central configuration file that points to other config locations:
+
 ```yaml
-db_config_path: "config/db_details.yml"
-table_configs_path: "config/tables/"
-custom_tests_path: "custom_tests/"
+db_config_path: "config/db_details.yml"     # Database connection details
+table_configs_path: "config/tables/"         # Directory containing table test definitions
+custom_tests_path: "custom_tests/"           # Directory for custom SQL tests
 ```
 
-### Database Configuration (db_details.yml)
+### 2. Database Configuration (`db_details.yml`)
+Define your database connection details. Examples for supported databases:
 
-Snowflake:
 ```yaml
+# Snowflake
 type: "snowflake"
-user: "SNOWFLAKE_USER"
-password: "SNOWFLAKE_PASSWORD"
-account: "SNOWFLAKE_ACCOUNT"    # Example: xy12345.us-east-1
-warehouse: "SNOWFLAKE_WAREHOUSE"
-database: "SNOWFLAKE_DATABASE"
-schema: "SNOWFLAKE_SCHEMA"      # Optional, defaults to PUBLIC
-role: "SNOWFLAKE_ROLE" 
-```
+user: ${SNOWFLAKE_USER}          # Uses environment variables
+password: ${SNOWFLAKE_PASSWORD}
+account: ${SNOWFLAKE_ACCOUNT}     # e.g., xy12345.us-east-1
+warehouse: ${SNOWFLAKE_WAREHOUSE}
+database: ${SNOWFLAKE_DATABASE}
+schema: ${SNOWFLAKE_SCHEMA}       # Optional, defaults to PUBLIC
+role: ${SNOWFLAKE_ROLE}
 
-DuckDB:
-```yaml
+# DuckDB
 type: "duckdb"
-database_file: "data_quality_test.duckdb"
-```
+database_file: "path/to/your.duckdb"
 
-PostgreSQL:
-```yaml
+# PostgreSQL
 type: "postgresql"
 host: "localhost"
 port: "5432"
 database: "your_database"
 user: "your_username"
 password: "your_password"
-```
 
-Trino:
-```yaml
+# Trino
 type: "trino"
 host: "localhost"
 port: "8080"
 user: "your_username"
 catalog: "your_catalog"
-schema: "your_schema"  # optional
+schema: "your_schema"  # Optional
 ```
 
-### Table Configuration (config/tables/users.yml)
+### 3. Table Test Configurations
+Create YAML files in your `table_configs_path` directory to define tests for your tables:
+
 ```yaml
-sandbox.users:
+# users.yml
+schema.table_name:
   columns:
     - name: user_id
       tests:
@@ -95,97 +96,98 @@ sandbox.users:
       tests:
         - no_nulls
         - accepted_values: ['active', 'inactive', 'pending']
-  ...
+        - custom_test_name  # Points to custom_tests/custom_test_name.sql
 ```
 
-### Custom Tests
+## Built-in Test Types
 
-Create SQL files in the `custom_tests` directory:
+- `no_nulls`: Ensures column contains no NULL values
+- `unique`: Verifies all values in column are unique
+- `accepted_values`: Checks values against a predefined list
+- `max_len`: Validates maximum string length
+
+## Custom Tests
+
+Create SQL files in your `custom_tests` directory:
 
 ```sql
--- custom_tests/no_future_dates.sql
-select *
-from {{schema}}.{{table_name}}
-where {{column}} > current_date() + 1
+-- custom_tests/positive_amount.sql
+SELECT *
+FROM {{schema}}.{{table_name}}
+WHERE {{column}} <= 0
 ```
 
-## Usage
+The framework uses Jinja templating with these variables:
+- `{{schema}}`: Database schema
+- `{{table_name}}`: Table name
+- `{{column}}`: Column being tested
 
-1. Set up your configuration files as shown above.
+## Running Tests
 
-2. Run the framework:
 ```bash
-python run_dq_checks.py
+# Run all tests
+python run_dq_tests.py
+
+# Run tests from specific YAML files
+python run_dq_tests.py --yaml-files users orders
+
+# Run single file
+python run_dq_tests.py --yaml-files users
 ```
 
-## Sample Output
+## Example Output
 
 ```
+Running tests for schema.users
+Column: user_id
+Test 'unique': PASS
+Test 'no_nulls': PASS
+Test 'max_len: 20': PASS
+
+Column: status
+Test 'no_nulls': PASS
+Test 'accepted_values: ["active", "inactive"]': FAIL
+
 TEST SUMMARY
 ================================================================================
-
 Overall Results:
-Total tests run: 25
-Tests passed:    20 (80.0%)
-Tests failed:    5
+Total tests run: 5
+Tests passed:    4 (80.0%)
+Tests failed:    1
 
 Test Results Distribution
-│●●●●●●●●●●●●●●●●●○○○○○○○○│ Failed: 5/25 (20.0%)
+●●●●○ Failed: 1/5 (20.0%)
 
 Results by Table:
-sandbox.users:
-├─ Total Tests: 15
-├─ Passed: 12 (80.0%)
-└─ Failed: 3
+schema.users:
+├─ Total Tests: 5
+├─ Passed: 4 (80.0%)
+└─ Failed: 1
    Column Details:
    user_id:
-   ├─ [████████████████████] 5/5 (100.0%)
+   ├─ [████████████████████] 3/3 (100.0%)
+   status:
+   ├─ [███████████████○○○○○] 1/2 (50.0%)
 ```
 
 ## Project Structure
 ```
-data_quality/
+SQL-WatchPup/
 ├── config/
-│   ├── db_details.yml
-│   └── tables/
+│   ├── db_details.yml          # Database connection details
+│   └── tables/                 # Table test definitions
 │       ├── users.yml
 │       └── orders.yml
-├── custom_tests/
-│   ├── no_future_dates.sql
-│   └── custom_positive_amount.sql
-├── run_dq_checks.py
-├── main_config.yml
-├── requirements.txt
-├── db_details.yml
-└── README.md
+├── custom_tests/               # Custom SQL test files
+│   └── positive_amount.sql
+├── run_dq_tests.py            # Main script
+├── master_config.yml          # Main configuration
+└── requirements.txt           # Python dependencies
 ```
-
-## Extending the Framework
-
-### Adding New Database Support
-
-1. Create a new connector class that implements the `DatabaseConnector` interface:
-```python
-class NewDBConnector(DatabaseConnector):
-    def connect(self, config):
-        # Implementation
-    
-    def execute_query(self, query):
-        # Implementation
-    
-    def close(self):
-        # Implementation
-```
-
-2. Add the connector to the `CONNECTORS` dictionary in `DataQualityFramework`.
-
-### Adding New Test Types
-
-Add new test logic to the `_run_default_test` method in `DataQualityFramework`.
 
 ## Contributing
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
