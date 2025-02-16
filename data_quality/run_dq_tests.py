@@ -566,15 +566,12 @@ class DataQualityFramework:
                     
                     column_results.append(result)
                     
-                    # Only output test status if it fails
+                    # Display test status for all tests
+                    test_display = test if isinstance(test, str) else f"{list(test.keys())[0]}: {list(test.values())[0]}"
+                    status = colored('PASS', 'green') if result else colored('FAIL', 'red')
+                    print(f"Test '{test_display}': {status}")
                     if not result:
-                        test_display = test if isinstance(test, str) else f"{list(test.keys())[0]}: {list(test.values())[0]}"
-                        print(f"Test '{test_display}': {colored('FAIL', 'red')}")
                         failures.append(test_display)
-                
-                # Show summary if all tests passed
-                if not failures:
-                    print(colored("✓ All tests passed", "green"))
                 
                 table_results[qualified_table][column_name] = column_results
         
