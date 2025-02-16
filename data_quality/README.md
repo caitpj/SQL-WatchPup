@@ -1,6 +1,6 @@
 # Data Quality Tests
 
-A powerful and flexible data quality testing framework that makes it easy to validate your data across multiple database types. Define your tests in YAML, run them with a simple command, and get clear, visual results.
+A powerful and flexible data quality testing framework that makes it easy to validate your data. Define your tests in YAML, run them with a simple command, and get clear, visual results.
 
 ## Key Features
 
