@@ -5,12 +5,10 @@ import jinja2
 import pandas as pd
 import traceback
 import logging
-from datetime import datetime
+import argparse
 from termcolor import colored
 from typing import Dict, List, Tuple, Any
-from pathlib import Path
 from abc import ABC, abstractmethod
-from importlib import import_module
 
 # Set up logging
 logging.basicConfig(
@@ -207,6 +205,12 @@ class SnowflakeConnector(DatabaseConnector):
     def default_schema(self) -> str:
         return 'PUBLIC'
 
+def resolve_path(base_path: str, relative_path: str) -> str:
+    """Resolve a path relative to the base path."""
+    if os.path.isabs(relative_path):
+        return relative_path
+    return os.path.normpath(os.path.join(os.path.dirname(base_path), relative_path))
+
 class DataQualityFramework:
     CONNECTORS = {
         'duckdb': 'DuckDBConnector',
@@ -216,11 +220,27 @@ class DataQualityFramework:
         'snowflake': 'SnowflakeConnector'
     }
 
-    def __init__(self, main_config_path: str):
-        """Initialize framework with main config path"""
-        logger.info(f"Initializing DataQualityFramework with config: {main_config_path}")
+    def __init__(self, yaml_files: List[str] = None):
+        """Initialize framework with optional specific YAML files to test
+        
+        Args:
+            yaml_files: Optional list of specific YAML files to test
+        """
+        self.script_path = os.path.abspath(__file__)
+        self.yaml_files = yaml_files
+        
+        parent_dir = os.path.dirname(os.path.dirname(self.script_path))
+        main_config_path = os.path.join(parent_dir, 'master_config.yml')
+        
+        logger.info(f"Initializing DataQualityFramework")
+        if yaml_files:
+            logger.info(f"Will only test the following YAML files: {', '.join(yaml_files)}")
+        
         self.main_config = self._load_yaml(main_config_path)
-        self.db_config = self._load_yaml(self.main_config['db_config_path'])
+        
+        # Resolve db_config_path relative to script location
+        db_config_path = resolve_path(self.script_path, self.main_config['db_config_path'])
+        self.db_config = self._load_yaml(db_config_path)
         self.db = self._initialize_db_connector()
         self.custom_tests = self._load_custom_tests()
         self.table_configs = self._load_table_configs()
@@ -282,7 +302,8 @@ class DataQualityFramework:
     def _load_custom_tests(self) -> dict:
         """Load custom test SQL queries from custom_tests directory."""
         custom_tests = {}
-        custom_tests_dir = self.main_config.get('custom_tests_path', 'custom_tests')
+        custom_tests_dir = resolve_path(self.script_path, 
+                                      self.main_config.get('custom_tests_path', 'custom_tests'))
         
         logger.info(f"Loading custom tests from: {custom_tests_dir}")
         
@@ -312,18 +333,47 @@ class DataQualityFramework:
         return self.db.default_schema, parts[0]
         
     def _load_table_configs(self) -> Dict[str, dict]:
-        """Load all YAML files from the specified config directory."""
+        """Load YAML files from the specified config directory.
+        If yaml_files is specified, only load those specific files from the config directory."""
         table_configs = {}
-        config_dir = self.main_config['table_configs_path']
+        config_dir = resolve_path(self.script_path, self.main_config['table_configs_path'])
         
         logger.info(f"Loading table configs from: {config_dir}")
         
         if not os.path.exists(config_dir):
-            logger.error(f"Config directory '{config_dir}' not found")
-            raise FileNotFoundError(f"Config directory '{config_dir}' not found")
-            
-        for filename in os.listdir(config_dir):
-            if filename.endswith(('.yml', '.yaml')):
+            raise FileNotFoundError(f"Config directory not found: {config_dir}")
+
+        # Get all YAML files in the directory
+        available_files = {
+            os.path.splitext(f)[0]: f  # Store filename without extension as key
+            for f in os.listdir(config_dir)
+            if f.endswith(('.yml', '.yaml'))
+        }
+        
+        if self.yaml_files:
+            # Process only specified files
+            for yaml_file in self.yaml_files:
+                # Remove extension if present
+                base_name = os.path.splitext(yaml_file)[0]
+                
+                if base_name in available_files:
+                    file_path = os.path.join(config_dir, available_files[base_name])
+                    logger.info(f"Loading specified config file: {file_path}")
+                    try:
+                        config = self._load_yaml(file_path)
+                        if config:
+                            table_configs.update(config)
+                    except Exception as e:
+                        logger.error(f"Failed to load config file {yaml_file}: {str(e)}")
+                else:
+                    available_files_list = ", ".join(sorted(available_files.keys()))
+                    raise FileNotFoundError(
+                        f"\nYAML file '{yaml_file}' not found in config directory: {config_dir}"
+                        f"\n{colored('Available YAML files:', 'yellow')} {available_files_list}"
+                    )
+        else:
+            # Process all YAML files in directory
+            for filename in available_files.values():
                 file_path = os.path.join(config_dir, filename)
                 logger.debug(f"Loading table config from: {file_path}")
                 try:
@@ -332,8 +382,14 @@ class DataQualityFramework:
                         table_configs.update(config)
                 except Exception as e:
                     logger.error(f"Failed to load config file {filename}: {str(e)}")
-                    
-        logger.info(f"Loaded configurations for {len(table_configs)} tables")
+        
+        if not table_configs:
+            if self.yaml_files:
+                raise ValueError("No valid configurations found in specified YAML files")
+            else:
+                raise ValueError("No valid configurations found in config directory")
+        
+        logger.info(f"Loaded configurations for {len(table_configs)} tables from {len(table_configs)} files")
         return table_configs
         
     def _run_custom_test(self, schema: str, table: str, column: str, test: str) -> bool:
@@ -555,15 +611,12 @@ class DataQualityFramework:
                     
                     column_results.append(result)
                     
-                    # Only output test status if it fails
+                    # Display test status for all tests
+                    test_display = test if isinstance(test, str) else f"{list(test.keys())[0]}: {list(test.values())[0]}"
+                    status = colored('PASS', 'green') if result else colored('FAIL', 'red')
+                    print(f"Test '{test_display}': {status}")
                     if not result:
-                        test_display = test if isinstance(test, str) else f"{list(test.keys())[0]}: {list(test.values())[0]}"
-                        print(f"Test '{test_display}': {colored('FAIL', 'red')}")
                         failures.append(test_display)
-                
-                # Show summary if all tests passed
-                if not failures:
-                    print(colored("✓ All tests passed", "green"))
                 
                 table_results[qualified_table][column_name] = column_results
         
@@ -571,23 +624,21 @@ class DataQualityFramework:
         self.db.close()
 
 def main():
-    if len(sys.argv) > 2:
-        print("Usage: python quality_check.py <optional main_config_path>")
-        sys.exit(1)
-    elif len(sys.argv) == 2:
-        config = sys.argv[1]
-    else:
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config = os.path.join(parent_dir, 'config.yml')
+    parser = argparse.ArgumentParser(description='Run data quality checks')
+    parser.add_argument('--yaml-files', nargs='+', help='Specific YAML files to test from the table_configs_path directory')
+    args = parser.parse_args()
     
-    logger.info(f"Starting quality checks with config file: {config}")
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config = os.path.join(parent_dir, 'master_config.yml')
     
     try:
         logger.info("Loading configuration...")
-        framework = DataQualityFramework(config)
+        framework = DataQualityFramework(yaml_files=args.yaml_files)
         logger.info("Configuration loaded successfully")
         
-        logger.info("Database config loaded:")
+        if args.yaml_files:
+            logger.info(f"Running tests only for specified YAML files: {', '.join(args.yaml_files)}")
+        
         logger.info(f"Database type: {framework.db_config.get('type')}")
         logger.info(f"Found {len(framework.table_configs)} tables to test")
         
@@ -595,22 +646,18 @@ def main():
         framework.run_tests()
         
     except FileNotFoundError as e:
-        logger.error(f"File not found error: {str(e)}")
-        logger.error(f"Current working directory: {os.getcwd()}")
-        logger.error("Please check if your config files exist in the correct location")
+        logger.error(colored("Error:", 'red') + f" {str(e)}")
         sys.exit(1)
     except ImportError as e:
-        logger.error(f"Import error: {str(e)}")
-        logger.error("Please make sure all required packages are installed")
+        logger.error(colored("Package Error:", 'red') + f" {str(e)}")
         sys.exit(1)
     except yaml.YAMLError as e:
-        logger.error(f"YAML parsing error: {str(e)}")
-        logger.error("Please check your YAML file syntax")
+        logger.error(colored("YAML Error:", 'red') + f" {str(e)}")
         sys.exit(1)
     except Exception as e:
-        logger.error("An unexpected error occurred:")
+        logger.error(colored("Unexpected Error:", 'red'))
         logger.error(str(e))
-        logger.error("Full traceback:")
+        logger.error("\nFull traceback:")
         traceback.print_exc()
         sys.exit(1)
 

@@ -4,5 +4,5 @@ lineage_output_path_file: "lineage_mapper/output/lineage.md"
 
 # Quality Checks Locations
 db_config_path: "db_details.yml"
-table_configs_path: "checks/"
-custom_tests_path: "custom_tests/"
+table_configs_path: "test_docs/"
+custom_tests_path: "test_docs/custom_tests/"

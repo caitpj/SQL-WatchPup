@@ -132,7 +132,7 @@ class SQLLineageMapper:
             self.logger.error(f"Error saving Mermaid file: {str(e)}")
 
 def main():
-    config_path = "config.yml"
+    config_path = "master_config.yml"
     
     try:
         mapper = SQLLineageMapper(config_path)
