@@ -228,9 +228,7 @@ class DataQualityFramework:
         """
         self.script_path = os.path.abspath(__file__)
         self.yaml_files = yaml_files
-        
-        parent_dir = os.path.dirname(os.path.dirname(self.script_path))
-        main_config_path = os.path.join(parent_dir, 'master_config.yml')
+        main_config_path = os.path.join(os.path.dirname(self.script_path), 'config.yml')
         
         logger.info(f"Initializing DataQualityFramework")
         if yaml_files:
@@ -627,9 +625,6 @@ def main():
     parser = argparse.ArgumentParser(description='Run data quality checks')
     parser.add_argument('--yaml-files', nargs='+', help='Specific YAML files to test from the table_configs_path directory')
     args = parser.parse_args()
-    
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config = os.path.join(parent_dir, 'master_config.yml')
     
     try:
         logger.info("Loading configuration...")

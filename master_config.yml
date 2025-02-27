@@ -1,8 +1,0 @@
-# SQL Lineage Mapper Locations
-sql_folder_path: "mock-files/SQL-files"
-lineage_output_path_file: "lineage_mapper/output/lineage.md"
-
-# Quality Checks Locations
-db_config_path: "db_details.yml"
-table_configs_path: "test_docs/"
-custom_tests_path: "test_docs/custom_tests/"
