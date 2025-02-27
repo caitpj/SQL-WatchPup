@@ -89,15 +89,6 @@ python generate_lineage.py --no-browser                # Don't auto-open the bro
 ![image](https://github.com/user-attachments/assets/852a4259-1cb2-4ffb-b8a6-09f43d726a17)
 
 
-```mermaid
-flowchart TD
-    source_table_a-->model_1
-    model_1-->model_2
-    model_1-->model_3
-    source_table_b-->model_2
-    model_3-->model_4
-```
-
 ## Example Project Structure
 
 ```
