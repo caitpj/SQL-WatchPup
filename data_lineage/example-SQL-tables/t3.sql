@@ -1,1 +1,0 @@
-select * from sand.t1
