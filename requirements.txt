@@ -1,4 +1,4 @@
-# run pip install -r requirements.txt in the command line
+# run "pip install -r requirements.txt" in the command line
 
 # Core dependencies
 pyyaml>=6.0      # For YAML file handling

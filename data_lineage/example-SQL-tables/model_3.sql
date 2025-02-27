@@ -1,0 +1,1 @@
+select * from sand.model_1

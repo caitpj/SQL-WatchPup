@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive SQL Lineage Diagram</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre-d3/0.6.4/dagre-d3.min.js"></script>
+    <style>
+        body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+#graph-container {
+    width: 100vw;
+    height: 100vh;
+    background-color: #f8fafc;
+    position: relative;
+}
+
+#search-container {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    padding: 0 15px;
+    width: 300px;
+    z-index: 1000;
+}
+
+.search-icon {
+    display: flex;
+    align-items: center;
+    color: #64748b;
+    margin-right: 10px;
+}
+
+#search-input {
+    border: none;
+    height: 42px;
+    flex-grow: 1;
+    outline: none;
+    font-size: 14px;
+    color: #334155;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+}
+
+#search-input::placeholder {
+    color: #94a3b8;
+}
+
+#reset-view {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: white;
+    border: none;
+    border-radius: 8px;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #64748b;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    z-index: 1000;
+    padding: 0;
+    margin: 0;
+}
+
+#reset-view:hover {
+    background-color: #f1f5f9;
+    color: #334155;
+}
+
+#graph-container > svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.node {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.node rect {
+    transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
+}
+
+.node.dragging {
+    cursor: grabbing;
+}
+
+.node.highlighted rect {
+    fill: #FFA500;
+    stroke: #e59500;
+    stroke-width: 2.5px;
+}
+
+.edge path {
+    stroke: #999;
+    stroke-width: 1.5px;
+    opacity: 0.7;
+    transition: stroke 0.2s, stroke-width 0.2s, opacity 0.2s;
+}
+
+.edge path.highlighted {
+    stroke: #FFA500;
+    stroke-width: 2.5px;
+    opacity: 1;
+}
+
+.hidden {
+    display: none;
+  }
+
+#show-all {
+    position: absolute;
+    top: 20px;
+    right: 72px; /* Positioned to the left of the reset button with some spacing */
+    background-color: white;
+    border: none;
+    border-radius: 8px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #64748b;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    z-index: 1000;
+    padding: 0 15px;
+    margin: 0;
+}
+
+#show-all:hover {
+    background-color: #f1f5f9;
+    color: #334155;
+}
+
+#show-all svg {
+    margin-right: 8px;
+}
+        
+        /* Add this to your CSS */
+        .hidden {
+            display: none;
+        }
+        
+        #show-all {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        
+        #show-all svg {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="search-container">
+        <span class="search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
+        <input type="text" id="search-input" placeholder="Search models...">
+    </div>
+    
+    <button id="reset-view" title="Reset view">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"></path><path d="M3 13a9 9 0 1 0 3-7.7L3 8"></path></svg>
+    </button>
+    
+    <button id="show-all" title="Show all nodes">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></svg>
+        Show All
+    </button>
+    
+    <div id="graph-container"></div>
+
+    <!-- Graph data as JSON -->
+    <script id="graph-data" type="application/json">
+        {"nodes": [{"id": "02_processed_source_data", "name": "02 Processed Source Data"}, {"id": "07_status_trend_analysis", "name": "07 Status Trend Analysis"}, {"id": "17_comprehensive_performance_analysis", "name": "17 Comprehensive Performance Analysis"}, {"id": "model_4", "name": "Model 4"}, {"id": "14_data_lineage_impact_analysis", "name": "14 Data Lineage Impact Analysis"}, {"id": "model_1", "name": "Model 1"}, {"id": "16_multi_model_analysis", "name": "16 Multi Model Analysis"}, {"id": "15_data_lineage_final_summary", "name": "15 Data Lineage Final Summary"}, {"id": "13_data_lineage_enrichment", "name": "13 Data Lineage Enrichment"}, {"id": "model_8", "name": "Model 8"}, {"id": "05_high_value_items", "name": "05 High Value Items"}, {"id": "source_table_3", "name": "Source Table 3"}, {"id": "20_integrated_model_analysis", "name": "20 Integrated Model Analysis"}, {"id": "08_advanced_filtering", "name": "08 Advanced Filtering"}, {"id": "01_initial_source_tables", "name": "01 Initial Source Tables"}, {"id": "model_7", "name": "Model 7"}, {"id": "source_table_b", "name": "Source Table B"}, {"id": "18_cross_model_insights", "name": "18 Cross Model Insights"}, {"id": "source_table_a", "name": "Source Table A"}, {"id": "source_table_4", "name": "Source Table 4"}, {"id": "19_holistic_model_integration", "name": "19 Holistic Model Integration"}, {"id": "03_value_aggregation", "name": "03 Value Aggregation"}, {"id": "12_data_lineage_transformation", "name": "12 Data Lineage Transformation"}, {"id": "model_2", "name": "Model 2"}, {"id": "model_6", "name": "Model 6"}, {"id": "04_status_distribution", "name": "04 Status Distribution"}, {"id": "06_category_performance", "name": "06 Category Performance"}, {"id": "09_comparative_analysis", "name": "09 Comparative Analysis"}, {"id": "11_data_lineage_initial_overview", "name": "11 Data Lineage Initial Overview"}, {"id": "10_final_summary", "name": "10 Final Summary"}, {"id": "model_5", "name": "Model 5"}, {"id": "model_3", "name": "Model 3"}], "links": [{"source": "source_table_a", "target": "model_1"}, {"source": "07_status_trend_analysis", "target": "19_holistic_model_integration"}, {"source": "07_status_trend_analysis", "target": "17_comprehensive_performance_analysis"}, {"source": "06_category_performance", "target": "16_multi_model_analysis"}, {"source": "source_table_4", "target": "03_value_aggregation"}, {"source": "source_table_3", "target": "01_initial_source_tables"}, {"source": "06_category_performance", "target": "20_integrated_model_analysis"}, {"source": "model_5", "target": "model_6"}, {"source": "source_table_4", "target": "08_advanced_filtering"}, {"source": "03_value_aggregation", "target": "14_data_lineage_impact_analysis"}, {"source": "07_status_trend_analysis", "target": "18_cross_model_insights"}, {"source": "02_processed_source_data", "target": "20_integrated_model_analysis"}, {"source": "06_category_performance", "target": "19_holistic_model_integration"}, {"source": "model_1", "target": "model_2"}, {"source": "02_processed_source_data", "target": "19_holistic_model_integration"}, {"source": "02_processed_source_data", "target": "17_comprehensive_performance_analysis"}, {"source": "06_category_performance", "target": "18_cross_model_insights"}, {"source": "model_6", "target": "model_7"}, {"source": "source_table_3", "target": "03_value_aggregation"}, {"source": "source_table_4", "target": "09_comparative_analysis"}, {"source": "03_value_aggregation", "target": "20_integrated_model_analysis"}, {"source": "source_table_4", "target": "10_final_summary"}, {"source": "source_table_3", "target": "08_advanced_filtering"}, {"source": "source_table_4", "target": "05_high_value_items"}, {"source": "source_table_4", "target": "02_processed_source_data"}, {"source": "model_3", "target": "model_4"}, {"source": "08_advanced_filtering", "target": "11_data_lineage_initial_overview"}, {"source": "03_value_aggregation", "target": "19_holistic_model_integration"}, {"source": "03_value_aggregation", "target": "17_comprehensive_performance_analysis"}, {"source": "source_table_b", "target": "model_2"}, {"source": "model_2", "target": "model_5"}, {"source": "03_value_aggregation", "target": "18_cross_model_insights"}, {"source": "source_table_3", "target": "09_comparative_analysis"}, {"source": "source_table_3", "target": "10_final_summary"}, {"source": "source_table_3", "target": "05_high_value_items"}, {"source": "source_table_4", "target": "06_category_performance"}, {"source": "07_status_trend_analysis", "target": "12_data_lineage_transformation"}, {"source": "source_table_3", "target": "02_processed_source_data"}, {"source": "model_5", "target": "model_7"}, {"source": "model_7", "target": "model_8"}, {"source": "source_table_4", "target": "07_status_trend_analysis"}, {"source": "source_table_4", "target": "04_status_distribution"}, {"source": "08_advanced_filtering", "target": "16_multi_model_analysis"}, {"source": "source_table_3", "target": "06_category_performance"}, {"source": "02_processed_source_data", "target": "15_data_lineage_final_summary"}, {"source": "model_1", "target": "model_3"}, {"source": "08_advanced_filtering", "target": "20_integrated_model_analysis"}, {"source": "06_category_performance", "target": "13_data_lineage_enrichment"}, {"source": "08_advanced_filtering", "target": "19_holistic_model_integration"}, {"source": "source_table_3", "target": "07_status_trend_analysis"}, {"source": "source_table_4", "target": "01_initial_source_tables"}, {"source": "source_table_3", "target": "04_status_distribution"}, {"source": "07_status_trend_analysis", "target": "16_multi_model_analysis"}, {"source": "08_advanced_filtering", "target": "18_cross_model_insights"}, {"source": "07_status_trend_analysis", "target": "20_integrated_model_analysis"}, {"source": "model_3", "target": "model_5"}]}
+    </script>
+
+    <!-- D3.js visualization script -->
+    <script>
+        // Data lineage visualization using dagre-d3
+// Parse the graph data
+const graphDataElem = document.getElementById('graph-data');
+const graphData = JSON.parse(graphDataElem.textContent);
+
+// Create a nodeById map for quick access
+const nodeById = {};
+graphData.nodes.forEach(node => {
+  nodeById[node.id] = node;
+  // Initialize position properties
+  node.x = 0;
+  node.y = 0;
+  node.fx = null;
+  node.fy = null;
+});
+
+// Set up SVG dimensions
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+// Create SVG container
+const svg = d3.select("#graph-container")
+  .append("svg")
+  .attr("width", width)
+  .attr("height", height);
+
+// Create root group for zoom/pan
+const rootGroup = svg.append("g");
+
+// Add zoom behavior
+const zoom = d3.zoom()
+  .scaleExtent([0.1, 4])
+  .on("zoom", (event) => {
+    rootGroup.attr("transform", event.transform);
+  });
+
+svg.call(zoom);
+
+// Create separate groups for edges and nodes
+const edgesGroup = rootGroup.append("g").attr("class", "edges");
+const nodesGroup = rootGroup.append("g").attr("class", "nodes");
+
+// Create the dagre-d3 renderer
+const render = new dagreD3.render();
+
+// Create a new directed graph for layout calculation
+const dagreGraph = new dagreD3.graphlib.Graph()
+  .setGraph({
+    rankdir: "LR", // Left to right layout
+    nodesep: 70,   // Spacing between nodes in same rank
+    ranksep: 150,  // Spacing between ranks
+    marginx: 40,
+    marginy: 40,
+    edgesep: 25    // Spacing between edges
+  })
+  .setDefaultEdgeLabel(() => ({}));
+
+// Process nodes for dagre layout
+graphData.nodes.forEach(node => {
+  const name = node.name || node.id || "Node";
+  const textWidth = name.length * 8;
+  const nodeWidth = Math.max(textWidth + 20, 80);
+  
+  dagreGraph.setNode(node.id, {
+    label: name,
+    width: nodeWidth,
+    height: 40,
+    rx: 5,
+    ry: 5
+  });
+});
+
+// Process edges for dagre layout
+graphData.links.forEach(link => {
+  const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+  const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+  
+  dagreGraph.setEdge(sourceId, targetId, {
+    curve: d3.curveBasis,
+    arrowhead: 'vee'
+  });
+});
+
+// Run the dagre layout algorithm
+dagre.layout(dagreGraph);
+
+// Transfer positions from the dagre layout to our node objects
+dagreGraph.nodes().forEach(nodeId => {
+  const dagreNode = dagreGraph.node(nodeId);
+  const node = nodeById[nodeId];
+  if (node) {
+    node.x = dagreNode.x;
+    node.y = dagreNode.y;
+    // Store original positions for reset
+    node.originalX = dagreNode.x;
+    node.originalY = dagreNode.y;
+    // Store size
+    node.width = dagreNode.width;
+    node.height = dagreNode.height;
+  }
+});
+
+// Create edge elements
+const edges = edgesGroup.selectAll("g.edge")
+  .data(graphData.links)
+  .enter()
+  .append("g")
+  .attr("class", "edge");
+
+// Add the path for each edge
+edges.append("path")
+  .attr("class", "edge-path")
+  .attr("id", d => {
+    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+    return `edge-${sourceId}-${targetId}`;
+  })
+  .attr("marker-end", "url(#arrowhead)")
+  .attr("stroke", "#999")
+  .attr("stroke-width", 1.5)
+  .attr("fill", "none");
+
+// Create node elements
+const nodes = nodesGroup.selectAll(".node")
+  .data(graphData.nodes)
+  .enter()
+  .append("g")
+  .attr("class", "node")
+  .attr("id", d => `node-${d.id}`);
+
+// Add rectangle for each node
+nodes.append("rect")
+  .attr("width", d => d.width)
+  .attr("height", d => d.height)
+  .attr("rx", 5)
+  .attr("ry", 5)
+  .attr("x", d => -d.width / 2)
+  .attr("y", d => -d.height / 2)
+  .attr("fill", "#69b3a2")
+  .attr("stroke", "#999");
+
+// Add text label for each node
+nodes.append("text")
+  .attr("text-anchor", "middle")
+  .attr("dominant-baseline", "central")
+  .attr("fill", "white")
+  .text(d => d.name || d.id);
+
+// Define arrow marker
+svg.append("defs").append("marker")
+  .attr("id", "arrowhead")
+  .attr("viewBox", "0 -5 10 10")
+  .attr("refX", 10)
+  .attr("refY", 0)
+  .attr("markerWidth", 6)
+  .attr("markerHeight", 6)
+  .attr("orient", "auto")
+  .append("path")
+  .attr("d", "M0,-5L10,0L0,5")
+  .attr("fill", "#999");
+
+// Create a drag behavior
+const drag = d3.drag()
+  .on("start", dragStart)
+  .on("drag", dragging)
+  .on("end", dragEnd);
+
+// Attach the drag behavior to the nodes
+nodes.call(drag);
+
+// Function to update node positions
+function updateNodesAndEdges() {
+  // Update node positions
+  nodes.attr("transform", d => `translate(${d.x},${d.y})`);
+  
+  // Update edge paths
+  edges.select("path").attr("d", d => {
+    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+    const sourceNode = nodeById[sourceId];
+    const targetNode = nodeById[targetId];
+    
+    if (!sourceNode || !targetNode) return "";
+    
+    // Calculate edge path with a curve
+    const dx = targetNode.x - sourceNode.x;
+    const dy = targetNode.y - sourceNode.y;
+    const dr = Math.sqrt(dx * dx + dy * dy);
+    
+    // Offset the start and end points by half node width/height
+    const sourceX = sourceNode.x + Math.sign(dx) * (sourceNode.width / 2);
+    const sourceY = sourceNode.y;
+    const targetX = targetNode.x - Math.sign(dx) * (targetNode.width / 2);
+    const targetY = targetNode.y;
+    
+    // Return a curved path
+    return `M${sourceX},${sourceY}C${sourceX + dx/3},${sourceY} ${targetX - dx/3},${targetY} ${targetX},${targetY}`;
+  });
+}
+
+// Drag event handlers
+function dragStart(event, d) {
+  d3.select(this).classed("dragging", true);
+  
+  // Highlight the node being dragged
+  clearHighlights();
+  highlightNode(d.id);
+  
+  event.sourceEvent.stopPropagation(); // Prevent pan during drag
+}
+
+function dragging(event, d) {
+  // Update the node position
+  d.x += event.dx;
+  d.y += event.dy;
+  
+  // Update the display
+  updateNodesAndEdges();
+}
+
+function dragEnd(event, d) {
+  d3.select(this).classed("dragging", false);
+  // Keep highlighting after drag ends
+}
+
+// Find all ancestors (parents, grandparents, etc.) of a node
+function findAncestors(nodeId, visited = new Set()) {
+  if (visited.has(nodeId)) return visited;
+  visited.add(nodeId);
+  
+  // Find all edges where this node is the target
+  graphData.links.forEach(link => {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    
+    if (targetId === nodeId) {
+      findAncestors(sourceId, visited);
+    }
+  });
+  
+  return visited;
+}
+
+// Find all descendants (children, grandchildren, etc.) of a node
+function findDescendants(nodeId, visited = new Set()) {
+  if (visited.has(nodeId)) return visited;
+  visited.add(nodeId);
+  
+  // Find all edges where this node is the source
+  graphData.links.forEach(link => {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    
+    if (sourceId === nodeId) {
+      findDescendants(targetId, visited);
+    }
+  });
+  
+  return visited;
+}
+
+// Find all family members (ancestors and descendants) of a node
+function findNodeFamily(nodeId) {
+  const ancestors = findAncestors(nodeId, new Set());
+  const descendants = findDescendants(nodeId, new Set());
+  
+  // Combine ancestors and descendants to get the complete family
+  const family = new Set([...ancestors, ...descendants]);
+  return family;
+}
+
+// Show only the family of the selected node
+function showOnlyFamily(nodeId) {
+  if (!nodeId) return;
+  
+  // Find all family members
+  const family = findNodeFamily(nodeId);
+  
+  // Hide all nodes not in the family
+  nodes.classed("hidden", d => !family.has(d.id));
+  
+  // Hide all edges not connecting family members
+  edges.classed("hidden", d => {
+    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+    
+    return !(family.has(sourceId) && family.has(targetId));
+  });
+  
+  // Highlight the selected node
+  d3.select(`#node-${CSS.escape(nodeId)}`).classed("highlighted", true);
+}
+
+// Show all nodes and edges
+function showAllNodes() {
+  nodes.classed("hidden", false);
+  edges.classed("hidden", false);
+  clearHighlights();
+}
+
+// Highlight only the node and its directly connected arrows
+function highlightNode(nodeId) {
+  if (!nodeId) return;
+  
+  // Highlight the selected node
+  d3.select(`#node-${CSS.escape(nodeId)}`).classed("highlighted", true);
+  
+  // Find and highlight connected edges only (not the connected nodes)
+  graphData.links.forEach(link => {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    
+    // If this link connects to our node, highlight it
+    if (sourceId === nodeId || targetId === nodeId) {
+      d3.select(`#edge-${CSS.escape(sourceId)}-${CSS.escape(targetId)} path`)
+        .classed("highlighted", true);
+    }
+  });
+}
+
+// Clear highlights
+function clearHighlights() {
+  nodes.classed("highlighted", false);
+  edges.selectAll("path").classed("highlighted", false);
+}
+
+// Search functionality
+const searchInput = document.getElementById("search-input");
+if (searchInput) {
+  let searchTimeout;
+  searchInput.addEventListener("input", function(e) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      const searchTerm = e.target.value.toLowerCase();
+      
+      if (searchTerm === "") {
+        clearHighlights();
+        showAllNodes(); // Show all nodes when search is cleared
+        return;
+      }
+      
+      // Find matching node
+      const matchingNode = graphData.nodes.find(node => {
+        const nameStr = (node.name || "").toLowerCase();
+        const idStr = (node.id || "").toLowerCase();
+        return nameStr.includes(searchTerm) || idStr.includes(searchTerm);
+      });
+      
+      if (matchingNode) {
+        clearHighlights();
+        showOnlyFamily(matchingNode.id); // Show only family of the found node
+        highlightNode(matchingNode.id);
+        
+        // Center view on the found node
+        const nodeX = matchingNode.x;
+        const nodeY = matchingNode.y;
+        
+        svg.transition()
+          .duration(500)
+          .call(zoom.transform, d3.zoomIdentity
+            .translate(width/2 - nodeX, height/2 - nodeY)
+            .scale(1.0));
+      }
+    }, 300);
+  });
+}
+
+// Reset view functionality
+const resetViewBtn = document.getElementById("reset-view");
+if (resetViewBtn) {
+  resetViewBtn.addEventListener("click", function() {
+    // Show all nodes
+    showAllNodes();
+    
+    // Clear highlights
+    clearHighlights();
+    
+    // Reset search input
+    if (searchInput) {
+      searchInput.value = "";
+    }
+    
+    // Reset node positions to original layout
+    graphData.nodes.forEach(node => {
+      node.x = node.originalX;
+      node.y = node.originalY;
+    });
+    
+    // Update the display
+    updateNodesAndEdges();
+    
+    // Reset zoom/pan
+    svg.transition()
+      .duration(750)
+      .call(zoom.transform, getOptimalZoomTransform());
+  });
+}
+
+// Show All button functionality
+const showAllBtn = document.getElementById("show-all");
+if (showAllBtn) {
+  showAllBtn.addEventListener("click", showAllNodes);
+}
+
+// Click handlers - must come after function definitions
+nodes.on("click", function(event, d) {
+  event.stopPropagation();
+  clearHighlights();
+  showOnlyFamily(d.id);
+});
+
+svg.on("click", function(event) {
+  if (event.target === this || event.target.tagName === 'svg') {
+    showAllNodes();
+  }
+});
+
+// Resize handler
+window.addEventListener('resize', function() {
+  const newWidth = window.innerWidth;
+  const newHeight = window.innerHeight;
+  
+  svg.attr("width", newWidth)
+     .attr("height", newHeight);
+
+  // Apply optimal zoom
+  svg.call(zoom.transform, getOptimalZoomTransform());
+});
+
+// Calculate optimal zoom transform to fit graph
+function getOptimalZoomTransform() {
+  // Find the bounds of the graph
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  
+  graphData.nodes.forEach(node => {
+    const halfWidth = node.width / 2;
+    const halfHeight = node.height / 2;
+    
+    minX = Math.min(minX, node.x - halfWidth);
+    minY = Math.min(minY, node.y - halfHeight);
+    maxX = Math.max(maxX, node.x + halfWidth);
+    maxY = Math.max(maxY, node.y + halfHeight);
+  });
+  
+  // Calculate graph dimensions
+  const graphWidth = maxX - minX;
+  const graphHeight = maxY - minY;
+  
+  if (graphWidth <= 0 || graphHeight <= 0) return d3.zoomIdentity;
+  
+  // Calculate scale to fit the graph with padding
+  const padding = 40;
+  const scaleX = (width - padding*2) / graphWidth;
+  const scaleY = (height - padding*2) / graphHeight;
+  const scale = Math.min(scaleX, scaleY, 2); // Cap scale at 2x
+  
+  // Calculate center of the graph
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  
+  // Calculate translation to center the graph
+  const translateX = width/2 - centerX * scale;
+  const translateY = height/2 - centerY * scale;
+  
+  return d3.zoomIdentity
+    .translate(translateX, translateY)
+    .scale(scale);
+}
+
+// Make sure all nodes are visible initially
+showAllNodes();
+
+// Initial setup
+updateNodesAndEdges();
+svg.call(zoom.transform, getOptimalZoomTransform());
+
+console.log("Graph rendered with", graphData.nodes.length, "nodes");
+    </script>
+</body>
+</html>

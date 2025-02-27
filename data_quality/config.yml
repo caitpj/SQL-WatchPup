@@ -1,0 +1,3 @@
+db_config_path: "db_details.yml"
+table_configs_path: "test_docs/"
+custom_tests_path: "test_docs/custom_tests/"
