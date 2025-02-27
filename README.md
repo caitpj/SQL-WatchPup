@@ -26,7 +26,8 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 - For more details, see README.md in the 'data_lineage' folder
 - Output screenshot:
 
-![image](https://github.com/user-attachments/assets/112ad9fc-01f4-4f78-a6d4-294d7244dd48)
+![image](https://github.com/user-attachments/assets/616d58bf-714e-49a6-8637-33df1ca17a2e)
+
 
 ## Contributing
 
