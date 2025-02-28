@@ -37,51 +37,73 @@ class SQLLineageMapper:
     def find_sql_files(self):
         return list(Path(self.root_folder).rglob('*.sql'))
     
+    def remove_comments(self, sql_content: str) -> str:
+        """Remove all comments from SQL content while preserving SQL structure."""
+        # First remove multi-line comments - replace with spaces to preserve SQL structure
+        sql_without_multi_comments = re.sub(r'/\*.*?\*/', ' ', sql_content, flags=re.DOTALL)
+        
+        # Then remove single-line comments
+        sql_without_comments = re.sub(r'--.*$', '', sql_without_multi_comments, flags=re.MULTILINE)
+        
+        return sql_without_comments
+    
     def extract_ctes(self, sql_content: str) -> set:
         """Extract CTE names from SQL content."""
-        # Match 'WITH name AS (' or ', name AS ('
-        cte_pattern = r'(?:with|,)\s+([a-zA-Z0-9_]+)\s+as\s*\('
+        # Remove all comments for CTE detection
+        sql_without_comments = self.remove_comments(sql_content)
+        
+        # Preserve newlines but normalize other whitespace
+        normalized_sql = '\n'.join(line.strip() for line in sql_without_comments.split('\n'))
+        
+        # Pattern for 'WITH name AS ('
+        with_pattern = r'with\s+([a-zA-Z0-9_]+)\s+as\s*\('
+        
+        # Pattern for ', name AS (' that handles commas at the beginning of lines
+        comma_pattern = r'(?:,|^\s*,)\s*([a-zA-Z0-9_]+)\s+as\s*\('
+        
         ctes = set()
         
-        # Find all CTEs in the SQL, ignoring case
-        matches = re.finditer(cte_pattern, sql_content, re.IGNORECASE)
-        for match in matches:
-            # Check if the match isn't in a comment
-            line_start = sql_content.rfind('\n', 0, match.start()) + 1
-            if line_start == 0:
-                line_start = 0
-            line_to_match = sql_content[line_start:match.start()]
-            if not line_to_match.strip().startswith('--'):
-                ctes.add(match.group(1).lower())
+        # Find all CTEs starting with 'WITH'
+        with_matches = re.finditer(with_pattern, normalized_sql, re.IGNORECASE)
+        for match in with_matches:
+            ctes.add(match.group(1).lower())
+        
+        # Find all CTEs starting with ','
+        comma_matches = re.finditer(comma_pattern, normalized_sql, re.IGNORECASE | re.MULTILINE)
+        for match in comma_matches:
+            ctes.add(match.group(1).lower())
                 
         return ctes
     
     def extract_parent_tables(self, sql_content: str):
         """Extract parent table names from SQL content using regex, excluding CTEs."""
-        parent_tables = set()
+        # Remove all comments
+        sql_without_comments = self.remove_comments(sql_content)
         
         # First, get all CTEs to exclude them
-        ctes = self.extract_ctes(sql_content)
-        
-        # Split into lines but preserve multi-line statements
-        sql_content = ' '.join(
-            line for line in sql_content.split('\n')
-            if not line.strip().startswith('--')
-        )
+        ctes = self.extract_ctes(sql_without_comments)
         
         # Find all 'from schema.table' or 'from table' patterns
         from_pattern = r'from\s+(([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)'
-        from_matches = re.finditer(from_pattern, sql_content, re.IGNORECASE)
+        from_matches = re.finditer(from_pattern, sql_without_comments, re.IGNORECASE)
         
         # Find all 'join schema.table' or 'join table' patterns
         join_pattern = r'join\s+(([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)'
-        join_matches = re.finditer(join_pattern, sql_content, re.IGNORECASE)
+        join_matches = re.finditer(join_pattern, sql_without_comments, re.IGNORECASE)
         
         # Process matches
+        parent_tables = set()
         for match in list(from_matches) + list(join_matches):
+            schema_name = match.group(2).lower() if match.group(2) else None
             table_name = match.group(3).lower()
-            # Only add if it's not a CTE
-            if table_name not in ctes:
+            
+            # If the table has a schema qualifier, always include it as a real table
+            # regardless of CTE names
+            if schema_name:
+                # Store the fully qualified name
+                parent_tables.add(f"{schema_name}.{table_name}")
+            # Otherwise only include unqualified table names that aren't CTEs
+            elif table_name not in ctes:
                 parent_tables.add(table_name)
         
         return parent_tables
