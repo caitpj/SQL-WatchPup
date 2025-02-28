@@ -1,8 +1,8 @@
--- Extended analysis using 08_advanced_filtering.sql as a model
+-- Extended analysis using playground.08_advanced_filtering.sql as a model
 WITH advanced_filter_base AS (
     -- Directly referencing the previous model file
     SELECT * FROM (
-        -- Assumes 08_advanced_filtering.sql exists and can be referenced
+        -- Assumes playground.08_advanced_filtering.sql exists and can be referenced
         SELECT 
             name,
             category,
@@ -10,7 +10,7 @@ WITH advanced_filter_base AS (
             status,
             status_total_value
         FROM 
-            08_advanced_filtering
+            playground.08_advanced_filtering
     ) base_data
 )
 SELECT 

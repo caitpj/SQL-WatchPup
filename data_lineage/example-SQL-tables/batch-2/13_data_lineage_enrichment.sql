@@ -1,8 +1,8 @@
--- Extended analysis using 06_category_performance.sql as a model
+-- Extended analysis using playground.06_category_performance.sql as a model
 WITH category_performance_base AS (
     -- Directly referencing the previous model file
     SELECT * FROM (
-        -- Assumes 06_category_performance.sql exists and can be referenced
+        -- Assumes playground.06_category_performance.sql exists and can be referenced
         SELECT 
             category,
             COUNT(*) as high_value_count,
@@ -10,7 +10,7 @@ WITH category_performance_base AS (
             SUM(value) as total_high_value,
             GROUP_CONCAT(DISTINCT status) as unique_statuses
         FROM 
-            06_category_performance
+            playground.06_category_performance
     ) base_data
 )
 SELECT 

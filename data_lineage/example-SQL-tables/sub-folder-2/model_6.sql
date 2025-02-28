@@ -1,1 +1,0 @@
-select * from sand.model_5

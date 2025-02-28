@@ -1,12 +1,12 @@
 -- Comprehensive performance analysis across multiple models
 WITH value_aggregation_data AS (
-    SELECT * FROM 03_value_aggregation
+    SELECT * FROM playground.03_value_aggregation
 ),
 filtered_categories_data AS (
-    SELECT * FROM 02_processed_source_data
+    SELECT * FROM playground.02_processed_source_data
 ),
 status_trend_data AS (
-    SELECT * FROM 07_status_trend_analysis
+    SELECT * FROM playground.07_status_trend_analysis
 )
 SELECT 
     va.category,

@@ -1,15 +1,15 @@
--- Extended analysis using 03_value_aggregation.sql as a model
+-- Extended analysis using playground.03_value_aggregation.sql as a model
 WITH value_aggregation_base AS (
     -- Directly referencing the previous model file
     SELECT * FROM (
-        -- Assumes 03_value_aggregation.sql exists and can be referenced
+        -- Assumes playground.03_value_aggregation.sql exists and can be referenced
         SELECT 
             category, 
             COUNT(*) as item_count,
             SUM(value) as total_value,
             AVG(value) as avg_value
         FROM 
-            03_value_aggregation
+            playground.03_value_aggregation
     ) base_data
 )
 SELECT 
