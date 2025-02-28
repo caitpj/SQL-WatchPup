@@ -1,8 +1,8 @@
--- Extended analysis using 07_status_trend_analysis.sql as a model
+-- Extended analysis using playground.07_status_trend_analysis.sql as a model
 WITH status_trend_base AS (
     -- Directly referencing the previous model file
     SELECT * FROM (
-        -- Assumes 07_status_trend_analysis.sql exists and can be referenced
+        -- Assumes playground.07_status_trend_analysis.sql exists and can be referenced
         SELECT 
             status,
             COUNT(*) as total_items,
@@ -10,7 +10,7 @@ WITH status_trend_base AS (
             AVG(value) as avg_value,
             GROUP_CONCAT(DISTINCT category) as related_categories
         FROM 
-            07_status_trend_analysis
+            playground.07_status_trend_analysis
     ) base_data
 )
 SELECT 

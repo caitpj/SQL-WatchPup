@@ -1,3 +1,4 @@
 sql_folder_path: "example-SQL-tables/"
 lineage_output: "output/"
 lineage_ui: "ui/"
+file-schema: "playground"

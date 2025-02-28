@@ -1,15 +1,15 @@
--- Extended analysis using 02_processed_source_data.sql as a model
+-- Extended analysis using playground.02_processed_source_data.sql as a model
 WITH filtered_categories_base AS (
     -- Directly referencing the previous model file
     SELECT * FROM (
-        -- Assumes 02_processed_source_data.sql exists and can be referenced
+        -- Assumes playground.02_processed_source_data.sql exists and can be referenced
         SELECT 
             name, 
             category, 
             value, 
             status
         FROM 
-            02_processed_source_data
+            playground.02_processed_source_data
     ) base_data
 )
 SELECT 

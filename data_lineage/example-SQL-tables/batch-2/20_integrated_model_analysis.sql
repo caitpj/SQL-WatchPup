@@ -1,18 +1,18 @@
 -- Integrated analysis across multiple previous models
 WITH advanced_filter_data AS (
-    SELECT * FROM 08_advanced_filtering
+    SELECT * FROM playground.08_advanced_filtering
 ),
 category_performance_data AS (
-    SELECT * FROM 06_category_performance
+    SELECT * FROM playground.06_category_performance
 ),
 filtered_categories_data AS (
-    SELECT * FROM 02_processed_source_data
+    SELECT * FROM playground.02_processed_source_data
 ),
 value_aggregation_data AS (
-    SELECT * FROM 03_value_aggregation
+    SELECT * FROM playground.03_value_aggregation
 ),
 status_trend_data AS (
-    SELECT * FROM 07_status_trend_analysis
+    SELECT * FROM playground.07_status_trend_analysis
 )
 SELECT 
     COALESCE(cp.category, fc.category, va.category, st.status) AS category,

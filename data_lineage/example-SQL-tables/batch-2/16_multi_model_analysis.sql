@@ -1,12 +1,12 @@
 -- Combined analysis using multiple previous models
 WITH advanced_filter_data AS (
-    SELECT * FROM 08_advanced_filtering
+    SELECT * FROM playground.08_advanced_filtering
 ),
 category_performance_data AS (
-    SELECT * FROM 06_category_performance
+    SELECT * FROM playground.06_category_performance
 ),
 status_trend_data AS (
-    SELECT * FROM 07_status_trend_analysis
+    SELECT * FROM playground.07_status_trend_analysis
 )
 SELECT 
     af.category,
