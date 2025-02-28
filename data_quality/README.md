@@ -31,6 +31,8 @@ pip install -r requirements.txt
 python run_dq_tests.py
 ```
 
+For a more detailed walkthrough, check out this article: [dbt Testing Without dbt](https://medium.com/data-engineer-things/dbt-testing-without-dbt-cb184df1fafa
+)
 ## Configuration
 
 The framework uses three types of configuration files:
