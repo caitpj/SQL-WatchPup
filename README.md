@@ -22,7 +22,7 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 
 
 ### 2. Data Lineage Mapper 
-- A Python tool that analyzes SQL files and generates a Mermaid diagram showing table lineage.
+- A Python tool that analyzes SQL files and from it generates an interactive data lineage diagram.
 - For more details, see README.md in the 'data_lineage' folder
 - Output screenshot:
 
