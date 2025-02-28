@@ -159,15 +159,6 @@ svg.append("defs").append("marker")
   .attr("d", "M0,-5L10,0L0,5")
   .attr("fill", "#999");
 
-// Create a drag behavior
-const drag = d3.drag()
-  .on("start", dragStart)
-  .on("drag", dragging)
-  .on("end", dragEnd);
-
-// Attach the drag behavior to the nodes
-nodes.call(drag);
-
 // Function to update node positions
 function updateNodesAndEdges() {
   // Update node positions
@@ -202,9 +193,8 @@ function updateNodesAndEdges() {
 function dragStart(event, d) {
   d3.select(this).classed("dragging", true);
   
-  // Highlight the node being dragged
-  clearHighlights();
-  highlightNode(d.id);
+  // Don't change the highlight state when dragging starts
+  // The highlight should only change when clicking
   
   event.sourceEvent.stopPropagation(); // Prevent pan during drag
 }
@@ -222,6 +212,15 @@ function dragEnd(event, d) {
   d3.select(this).classed("dragging", false);
   // Keep highlighting after drag ends
 }
+
+// Create a drag behavior
+const drag = d3.drag()
+  .on("start", dragStart)
+  .on("drag", dragging)
+  .on("end", dragEnd);
+
+// Attach the drag behavior to the nodes
+nodes.call(drag);
 
 // Find all ancestors (parents, grandparents, etc.) of a node
 function findAncestors(nodeId, visited = new Set()) {
@@ -324,45 +323,120 @@ function clearHighlights() {
   edges.selectAll("path").classed("highlighted", false);
 }
 
-// Search functionality
+// Center view on a specific node
+function centerOnNode(node) {
+  const nodeX = node.x;
+  const nodeY = node.y;
+  
+  svg.transition()
+    .duration(500)
+    .call(zoom.transform, d3.zoomIdentity
+      .translate(width/2 - nodeX, height/2 - nodeY)
+      .scale(1.0));
+}
+
+// Create a dropdown container for search results
 const searchInput = document.getElementById("search-input");
+const searchDropdown = document.createElement("div");
+searchDropdown.id = "search-dropdown";
+searchDropdown.className = "search-dropdown";
+
+// Add the dropdown next to the search input
+if (searchInput) {
+  searchInput.parentNode.appendChild(searchDropdown);
+}
+
+// Update dropdown position based on search input
+function updateDropdownPosition() {
+  if (!searchInput) return;
+  
+  const inputRect = searchInput.getBoundingClientRect();
+  searchDropdown.style.top = inputRect.height + "px";
+}
+
+// Search functionality with dropdown
 if (searchInput) {
   let searchTimeout;
+  
   searchInput.addEventListener("input", function(e) {
     clearTimeout(searchTimeout);
+    const searchTerm = e.target.value.toLowerCase();
+    
+    // Clear dropdown when search is cleared
+    if (searchTerm === "") {
+      searchDropdown.style.display = "none";
+      searchDropdown.innerHTML = "";
+      return;
+    }
+    
+    // Only show dropdown after 3 characters are entered
+    if (searchTerm.length < 3) {
+      searchDropdown.style.display = "none";
+      searchDropdown.innerHTML = "";
+      return;
+    }
+    
     searchTimeout = setTimeout(() => {
-      const searchTerm = e.target.value.toLowerCase();
-      
-      if (searchTerm === "") {
-        clearHighlights();
-        showAllNodes(); // Show all nodes when search is cleared
-        return;
-      }
-      
-      // Find matching node
-      const matchingNode = graphData.nodes.find(node => {
+      // Find matching nodes
+      const matchingNodes = graphData.nodes.filter(node => {
         const nameStr = (node.name || "").toLowerCase();
         const idStr = (node.id || "").toLowerCase();
         return nameStr.includes(searchTerm) || idStr.includes(searchTerm);
       });
       
-      if (matchingNode) {
-        clearHighlights();
-        showOnlyFamily(matchingNode.id); // Show only family of the found node
-        highlightNode(matchingNode.id);
+      // Update the dropdown
+      searchDropdown.innerHTML = "";
+      
+      if (matchingNodes.length > 0) {
+        searchDropdown.style.display = "block";
+        updateDropdownPosition();
         
-        // Center view on the found node
-        const nodeX = matchingNode.x;
-        const nodeY = matchingNode.y;
-        
-        svg.transition()
-          .duration(500)
-          .call(zoom.transform, d3.zoomIdentity
-            .translate(width/2 - nodeX, height/2 - nodeY)
-            .scale(1.0));
+        matchingNodes.forEach((node, index) => {
+          const item = document.createElement("div");
+          item.className = "dropdown-item";
+          item.textContent = node.name || node.id;
+          
+          // Handle click on dropdown item
+          item.addEventListener("click", function() {
+            searchInput.value = node.name || node.id; // Set the search input to the selected node
+            searchDropdown.style.display = "none"; // Hide dropdown
+            
+            // Find and highlight the selected node's family
+            clearHighlights();
+            showOnlyFamily(node.id);
+            highlightNode(node.id);
+            
+            // Center view on the selected node
+            centerOnNode(node);
+          });
+          
+          searchDropdown.appendChild(item);
+        });
+      } else {
+        searchDropdown.style.display = "none";
       }
     }, 300);
   });
+  
+  // Handle enter key
+  searchInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      const firstItem = searchDropdown.querySelector(".dropdown-item");
+      if (firstItem) {
+        firstItem.click(); // Simulate click on the first item
+      }
+    }
+  });
+  
+  // Hide dropdown when clicking outside
+  document.addEventListener("click", function(e) {
+    if (e.target !== searchInput && !searchDropdown.contains(e.target)) {
+      searchDropdown.style.display = "none";
+    }
+  });
+
+  // Update dropdown position on window resize
+  window.addEventListener("resize", updateDropdownPosition);
 }
 
 // Reset view functionality
@@ -378,6 +452,8 @@ if (resetViewBtn) {
     // Reset search input
     if (searchInput) {
       searchInput.value = "";
+      searchDropdown.style.display = "none";
+      searchDropdown.innerHTML = "";
     }
     
     // Reset node positions to original layout
@@ -407,13 +483,11 @@ nodes.on("click", function(event, d) {
   event.stopPropagation();
   clearHighlights();
   showOnlyFamily(d.id);
+  highlightNode(d.id);
 });
 
-svg.on("click", function(event) {
-  if (event.target === this || event.target.tagName === 'svg') {
-    showAllNodes();
-  }
-});
+// REMOVED: Background click handler to show all nodes
+// This functionality is now only available via the Show All button
 
 // Resize handler
 window.addEventListener('resize', function() {

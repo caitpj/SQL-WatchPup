@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import re
 import sys
 import os
@@ -9,11 +8,18 @@ import webbrowser
 from pathlib import Path
 import logging
 
+# Define colors for console output globally
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+RED = "\033[91m"
+RESET = "\033[0m"
+
 class SQLLineageMapper:
     def __init__(self, config_path: str):
         self.config = self.load_config(config_path)
         self.root_folder = self.config['sql_folder_path']
         self.output_folder = self.config.get('lineage_output', 'output')
+        self.file_schema = self.config.get('file-schema', None)  # Get the file-schema from config
         self.relationships = set()  # Store table relationships
         self.setup_logging()
         
@@ -114,12 +120,21 @@ class SQLLineageMapper:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
+            # Get the table name from the file name without path
             table_name = file_path.stem.lower()
+            
+            # Add schema prefix to the table name if file-schema is configured
+            if self.file_schema:
+                # Use the file-schema as the schema for the table
+                table_with_schema = f"{self.file_schema}.{table_name}"
+            else:
+                table_with_schema = table_name
+                
             parent_tables = self.extract_parent_tables(content)
             
             # Add relationships
             for parent in parent_tables:
-                self.relationships.add((parent, table_name))
+                self.relationships.add((parent, table_with_schema))
             
         except Exception as e:
             self.logger.error(f"Error processing {file_path}: {str(e)}")
@@ -197,7 +212,7 @@ def extract_mermaid_from_markdown(file_path):
     return mermaid_content
 
 def parse_mermaid_flowchart(mermaid_content):
-    """Parse mermaid flowchart to extract nodes and links with improved regex."""
+    """Parse mermaid flowchart to extract nodes and links with improved regex for schema-qualified names."""
     lines = mermaid_content.split('\n')
     
     # Check if the first line contains flowchart/graph definition
@@ -212,12 +227,12 @@ def parse_mermaid_flowchart(mermaid_content):
     relationship_lines = [line.strip() for line in lines[start_index:] if line.strip()]
     
     # Extract relationships with a more comprehensive regex
-    # This handles more node ID formats including quoted IDs
     nodes = set()
     links = []
     
-    # Improved regex that handles more node ID formats
-    relationship_pattern = r'(?:"([^"]+)"|([a-zA-Z0-9_\-:]+))\s*-->\s*(?:"([^"]+)"|([a-zA-Z0-9_\-:]+))'
+    # Improved regex that handles node IDs with dots (schema.table format)
+    # This regex handles both quoted and unquoted node IDs with schema qualifiers
+    relationship_pattern = r'(?:"([^"]+)"|([a-zA-Z0-9_\-.]+))\s*-->\s*(?:"([^"]+)"|([a-zA-Z0-9_\-.]+))'
     
     for line in relationship_lines:
         match = re.search(relationship_pattern, line)
@@ -231,23 +246,12 @@ def parse_mermaid_flowchart(mermaid_content):
             links.append({"source": source, "target": target})
     
     # Convert nodes to list of dictionaries with formatted names for better display
-    node_list = [
-        {
-            "id": node, 
-            "name": format_node_name(node)
-        } 
-        for node in nodes
-    ]
+    node_list = [{"id": node, "name": node} for node in nodes]
     
     return {
         "nodes": node_list,
         "links": links
     }
-
-def format_node_name(node_id):
-    """Format node ID to a more readable name."""
-    # Replace underscores with spaces and capitalize words
-    return ' '.join(word.capitalize() for word in node_id.split('_'))
 
 def read_file_content(file_path):
     """Read file content from a given file path."""
@@ -301,11 +305,6 @@ def generate_html(graph_data, output_path, html_template_path, js_file_path, css
     # Get the relative path for display
     rel_path = os.path.relpath(output_path)
     
-    # Define colors
-    GREEN = "\033[92m"
-    BLUE = "\033[94m"
-    RESET = "\033[0m"
-    
     # Print success message
     print(f"{GREEN}SUCCESS:{RESET} Created interactive diagram at {rel_path}")
     print(f"{BLUE}Open this file in a web browser to view the interactive diagram{RESET}")
@@ -347,6 +346,11 @@ def main():
         sql_folder_path = config.get('sql_folder_path')
         output_dir = config.get('lineage_output', 'output')
         ui_dir = config.get('lineage_ui', 'ui')
+        file_schema = config.get('file-schema')  # Get the file-schema from config
+        
+        # Log file-schema configuration if present
+        if file_schema:
+            print(f"Using '{file_schema}' as schema for SQL files")
         
         # Validate SQL folder path exists
         if not sql_folder_path:
@@ -373,20 +377,9 @@ def main():
                     sql_files_found.append(full_path)
         
         if not sql_files_found:
-            print("No SQL files found in the specified directory. Please check the sql_folder_path in the config file.")
-            # Create empty diagram
-            empty_mermaid = "flowchart TD"
-            md_file_path = os.path.join(output_dir, "lineage.md")
-            os.makedirs(os.path.dirname(md_file_path), exist_ok=True)
-            with open(md_file_path, 'w') as f:
-                f.write(f"```mermaid\n{empty_mermaid}\n```")
-            
-            # Define colors
-            GREEN = "\033[92m"
-            RESET = "\033[0m"
-            rel_path = os.path.relpath(md_file_path)
-            print(f"{GREEN}SUCCESS:{RESET} Created empty Mermaid diagram at {rel_path}")
-            return
+            print(f"{RED}FAILED:{RESET} No SQL files found in the specified directory: {sql_folder_path}")
+            print("Please check the sql_folder_path in the config file.")
+            sys.exit(1)
             
         html_filename = "sql_lineage_interactive.html"
         
@@ -407,14 +400,15 @@ def main():
         # Generate and save the Mermaid diagram
         mermaid_content = mapper.generate_mermaid()
         
-        # Only proceed if we have actual relationships
+        # Check if we have actual relationships
         if len(mapper.relationships) == 0:
-            print("No SQL relationships found. Check if your SQL files contain FROM or JOIN statements.")
-            # Still save the empty diagram for reference
-            md_file_path = mapper.save_mermaid(mermaid_content)
-            return
+            print(f"{RED}FAILED:{RESET} No SQL relationships found. Check if your SQL files contain FROM or JOIN statements.")
+            sys.exit(1)
             
+        # Save the Mermaid diagram with relationships
         md_file_path = mapper.save_mermaid(mermaid_content)
+        rel_path = os.path.relpath(str(md_file_path))
+        print(f"{GREEN}SUCCESS:{RESET} Created Mermaid diagram at {rel_path}")
         
         # Step 2: Convert Mermaid diagram to interactive visualization
         # Paths for template, JS and CSS files in ui directory specified in config
@@ -458,11 +452,11 @@ def main():
             webbrowser.open = original_open
         
     except FileNotFoundError as e:
-        print(f"Error: {str(e)}")
+        print(f"{RED}FAILED:{RESET} {str(e)}")
         print("Please create the required template, JS and CSS files before running this script.")
         sys.exit(1)
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"{RED}FAILED:{RESET} {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
