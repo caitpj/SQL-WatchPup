@@ -105,7 +105,12 @@ const edges = edgesGroup.selectAll("g.edge")
   .data(graphData.links)
   .enter()
   .append("g")
-  .attr("class", "edge");
+  .attr("class", "edge")
+  .attr("id", d => {
+    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+    return `edge-${sourceId}-${targetId}`;
+  });
 
 // Add the path for each edge
 edges.append("path")
@@ -268,11 +273,14 @@ function findNodeFamily(nodeId) {
   return family;
 }
 
-// Show only the family of the selected node
-function showOnlyFamily(nodeId) {
+// Function to show only the family of the selected node and rearrange them
+function showAndRearrangeFamily(nodeId) {
   if (!nodeId) return;
   
-  // Find all family members
+  // Clear any existing highlights first
+  clearHighlights();
+  
+  // Find all family members (ancestors and descendants)
   const family = findNodeFamily(nodeId);
   
   // Hide all nodes not in the family
@@ -288,6 +296,206 @@ function showOnlyFamily(nodeId) {
   
   // Highlight the selected node
   d3.select(`#node-${CSS.escape(nodeId)}`).classed("highlighted", true);
+  
+  // Create a new dagre layout for just the family, passing the selected node ID
+  rearrangeFamilyLayout(family, nodeId);
+}
+
+// Create a new layout for the family nodes
+function rearrangeFamilyLayout(family, selectedNodeId) {
+  // Remember the position of the selected node
+  const selectedNode = nodeById[selectedNodeId];
+  const selectedNodePos = { x: selectedNode.x, y: selectedNode.y };
+  
+  // Create a new dagre graph for layout calculation
+  const familyGraph = new dagreD3.graphlib.Graph()
+    .setGraph({
+      rankdir: "LR", // Left to right layout
+      nodesep: 70,    // Spacing between nodes in same rank
+      ranksep: 120,   // Spacing between ranks
+      marginx: 40,
+      marginy: 40,
+      edgesep: 25     // Spacing between edges
+    })
+    .setDefaultEdgeLabel(() => ({}));
+    
+  // Add only family nodes to the graph
+  graphData.nodes.forEach(node => {
+    if (family.has(node.id)) {
+      const name = node.name || node.id || "Node";
+      const textWidth = name.length * 8;
+      const nodeWidth = Math.max(textWidth + 20, 80);
+      
+      familyGraph.setNode(node.id, {
+        label: name,
+        width: nodeWidth,
+        height: 40,
+        rx: 5,
+        ry: 5
+      });
+    }
+  });
+  
+  // Add edges between family nodes
+  graphData.links.forEach(link => {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    
+    if (family.has(sourceId) && family.has(targetId)) {
+      familyGraph.setEdge(sourceId, targetId, {
+        curve: d3.curveBasis,
+        arrowhead: 'vee'
+      });
+    }
+  });
+  
+  // Run the dagre layout algorithm on the family graph
+  dagre.layout(familyGraph);
+  
+  // Create an animation for the transition
+  const t = d3.transition()
+    .duration(750);
+  
+  // Calculate the offset between dagre's position for the selected node and its actual position
+  const selectedDagreNode = familyGraph.node(selectedNodeId);
+  const offsetX = selectedNodePos.x - selectedDagreNode.x;
+  const offsetY = selectedNodePos.y - selectedDagreNode.y;
+  
+  // Update positions from the new layout, applying the offset to keep selected node fixed
+  familyGraph.nodes().forEach(nodeId => {
+    const dagreNode = familyGraph.node(nodeId);
+    const node = nodeById[nodeId];
+    if (node) {
+      // Apply the offset to all positions so the selected node stays in place
+      node.targetX = dagreNode.x + offsetX;
+      node.targetY = dagreNode.y + offsetY;
+    }
+  });
+  
+  // For the selected node, ensure it doesn't move
+  if (selectedNode) {
+    selectedNode.targetX = selectedNodePos.x;
+    selectedNode.targetY = selectedNodePos.y;
+  }
+  
+  // Animate nodes to their new positions, except the selected node
+  nodes.filter(d => family.has(d.id) && d.id !== selectedNodeId)
+    .transition(t)
+    .attr("transform", d => `translate(${d.targetX},${d.targetY})`);
+  
+  // Animate edge paths at the same time as nodes move
+  edges.filter(d => {
+    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+    return family.has(sourceId) && family.has(targetId);
+  }).select("path")
+    .transition(t)
+    .attrTween("d", function(d) {
+      const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+      const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+      const sourceNode = nodeById[sourceId];
+      const targetNode = nodeById[targetId];
+      
+      // Skip if nodes aren't available
+      if (!sourceNode || !targetNode) return () => "";
+      
+      // For the source or target that is being animated, we need to 
+      // interpolate its position during animation
+      const sourceIsMoving = sourceId !== selectedNodeId && family.has(sourceId);
+      const targetIsMoving = targetId !== selectedNodeId && family.has(targetId);
+      
+      // Initial positions
+      const startSourceX = sourceNode.x;
+      const startSourceY = sourceNode.y;
+      const startTargetX = targetNode.x;
+      const startTargetY = targetNode.y;
+      
+      // Final positions
+      const endSourceX = sourceIsMoving ? sourceNode.targetX : sourceNode.x;
+      const endSourceY = sourceIsMoving ? sourceNode.targetY : sourceNode.y;
+      const endTargetX = targetIsMoving ? targetNode.targetX : targetNode.x;
+      const endTargetY = targetIsMoving ? targetNode.targetY : targetNode.y;
+      
+      return function(t) {
+        // Interpolate positions
+        const currentSourceX = sourceIsMoving ? startSourceX + (endSourceX - startSourceX) * t : startSourceX;
+        const currentSourceY = sourceIsMoving ? startSourceY + (endSourceY - startSourceY) * t : startSourceY;
+        const currentTargetX = targetIsMoving ? startTargetX + (endTargetX - startTargetX) * t : startTargetX;
+        const currentTargetY = targetIsMoving ? startTargetY + (endTargetY - startTargetY) * t : startTargetY;
+        
+        // Calculate path parameters
+        const dx = currentTargetX - currentSourceX;
+        const dy = currentTargetY - currentSourceY;
+        
+        // Offset start and end points by half node width
+        const sourceX = currentSourceX + Math.sign(dx) * (sourceNode.width / 2);
+        const sourceY = currentSourceY;
+        const targetX = currentTargetX - Math.sign(dx) * (targetNode.width / 2);
+        const targetY = currentTargetY;
+        
+        // Return curved path
+        return `M${sourceX},${sourceY}C${sourceX + dx/3},${sourceY} ${targetX - dx/3},${targetY} ${targetX},${targetY}`;
+      };
+    });
+  
+  // Also update actual positions (after animation)
+  setTimeout(() => {
+    familyGraph.nodes().forEach(nodeId => {
+      const node = nodeById[nodeId];
+      if (node && nodeId !== selectedNodeId) {
+        node.x = node.targetX;
+        node.y = node.targetY;
+      }
+    });
+    updateNodesAndEdges();
+    
+    // Removed the fitFamilyView call to prevent automatic zooming
+  }, 750);
+}
+
+// Function to fit the view to show the entire family
+function fitFamilyView(family) {
+  // Calculate bounds of the family
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  
+  graphData.nodes.forEach(node => {
+    if (family.has(node.id)) {
+      const halfWidth = node.width / 2;
+      const halfHeight = node.height / 2;
+      
+      minX = Math.min(minX, node.x - halfWidth);
+      minY = Math.min(minY, node.y - halfHeight);
+      maxX = Math.max(maxX, node.x + halfWidth);
+      maxY = Math.max(maxY, node.y + halfHeight);
+    }
+  });
+  
+  // Calculate dimensions
+  const familyWidth = maxX - minX;
+  const familyHeight = maxY - minY;
+  
+  if (familyWidth <= 0 || familyHeight <= 0) return;
+  
+  // Calculate scale to fit with padding
+  const padding = 60;
+  const scaleX = (width - padding*2) / familyWidth;
+  const scaleY = (height - padding*2) / familyHeight;
+  const scale = Math.min(scaleX, scaleY, 2);
+  
+  // Calculate center of the family
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  
+  // Calculate translation to center the family
+  const translateX = width/2 - centerX * scale;
+  const translateY = height/2 - centerY * scale;
+  
+  // Apply the transform with animation
+  svg.transition()
+    .duration(500)
+    .call(zoom.transform, d3.zoomIdentity
+      .translate(translateX, translateY)
+      .scale(scale));
 }
 
 // Show all nodes and edges
@@ -401,13 +609,8 @@ if (searchInput) {
             searchInput.value = node.name || node.id; // Set the search input to the selected node
             searchDropdown.style.display = "none"; // Hide dropdown
             
-            // Find and highlight the selected node's family
-            clearHighlights();
-            showOnlyFamily(node.id);
-            highlightNode(node.id);
-            
-            // Center view on the selected node
-            centerOnNode(node);
+            // Show and rearrange the family
+            showAndRearrangeFamily(node.id);
           });
           
           searchDropdown.appendChild(item);
@@ -439,15 +642,23 @@ if (searchInput) {
   window.addEventListener("resize", updateDropdownPosition);
 }
 
+// Update node click handler
+nodes.on("click", function(event, d) {
+  event.stopPropagation();
+  showAndRearrangeFamily(d.id);
+});
+
 // Reset view functionality
 const resetViewBtn = document.getElementById("reset-view");
 if (resetViewBtn) {
   resetViewBtn.addEventListener("click", function() {
     // Show all nodes
-    showAllNodes();
+    nodes.classed("hidden", false);
+    edges.classed("hidden", false);
     
     // Clear highlights
-    clearHighlights();
+    nodes.classed("highlighted", false);
+    edges.classed("highlighted", false);
     
     // Reset search input
     if (searchInput) {
@@ -456,35 +667,37 @@ if (resetViewBtn) {
       searchDropdown.innerHTML = "";
     }
     
-    // Reset node positions to original layout
-    graphData.nodes.forEach(node => {
-      node.x = node.originalX;
-      node.y = node.originalY;
-    });
+    // Reset node positions to original layout with animation
+    const t = d3.transition().duration(750);
     
-    // Update the display
-    updateNodesAndEdges();
+    nodes.transition(t)
+      .attr("transform", d => `translate(${d.originalX},${d.originalY})`);
     
-    // Reset zoom/pan
-    svg.transition()
-      .duration(750)
-      .call(zoom.transform, getOptimalZoomTransform());
+    // Update actual positions after animation
+    setTimeout(() => {
+      graphData.nodes.forEach(node => {
+        node.x = node.originalX;
+        node.y = node.originalY;
+      });
+      
+      updateNodesAndEdges();
+      
+      // Reset zoom/pan
+      svg.transition()
+        .duration(500)
+        .call(zoom.transform, getOptimalZoomTransform());
+    }, 750);
   });
 }
 
-// Show All button functionality
+// Show All button functionality - simplified to act like page refresh
 const showAllBtn = document.getElementById("show-all");
 if (showAllBtn) {
-  showAllBtn.addEventListener("click", showAllNodes);
+  showAllBtn.addEventListener("click", function() {
+    // Simply reload the page to get a completely fresh state
+    window.location.reload();
+  });
 }
-
-// Click handlers - must come after function definitions
-nodes.on("click", function(event, d) {
-  event.stopPropagation();
-  clearHighlights();
-  showOnlyFamily(d.id);
-  highlightNode(d.id);
-});
 
 // REMOVED: Background click handler to show all nodes
 // This functionality is now only available via the Show All button
