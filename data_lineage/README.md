@@ -5,29 +5,26 @@ A Python tool that generates an interactive data lineage diagram from local SQL 
 ## What It Does
 
 1. Scans SQL files in a specified folder (including sub-folders)
-2. Intelligently extracts table relationships from FROM and JOIN clauses
-3. Detects and handles CTEs (Common Table Expressions)
-4. Ignores commented SQL lines
-5. Generates a Mermaid diagram showing table dependencies
-6. Creates an interactive HTML visualization with D3.js
-7. Auto-opens in a web browser to explore your data lineage
+2. Intelligently extracts table relationships using SQLLineage
+3. Generates a Mermaid diagram showing table dependencies
+4. Creates an interactive HTML visualization with D3.js
+5. Auto-opens in a web browser for instant exploration of your data lineage
 
 ## Interactive Features
 
 The generated HTML visualization provides:
 
-- Interactive graph with drag-and-drop node positioning
+- Interactive graph with drag-and-drop model positioning
 - Search functionality to find specific tables
 - Node highlighting to see dependencies
 - Zoom and pan capabilities
 - Filtering to focus on specific table lineage
-- Reset view button to restore the original layout
 - Show all button to display all tables after filtering
 
 ## Prerequisites
 
 - Python 3.x
-- PyYAML package
+- Pyhton packages in the requirements.txt file
 - Internet connection (for loading the JavaScript libraries)
 
 ### JavaScript Dependencies (loaded automatically via CDN)
@@ -53,7 +50,7 @@ pip install -r requirements.txt
 
 4. Create your data lineage:
 ```bash
-python generate_lineage.py
+python data_lineage/generate_lineage.py
 ```
 
 ## Configuration
@@ -71,7 +68,14 @@ file-schema: "playground"                # schema used for SQL file names i.e. {
 
 - Command line options:
 ```bash
-python generate_lineage.py --no-browser                # Don't auto-open the browser
+python generate_lineage.py --no-browser               # Don't auto-open the browser
+python generate_lineage.py -n
+
+python generate_lineage.py --config                   # Path to the YAML configuration file. default='config.yml'
+python generate_lineage.py -c
+
+python generate_lineage.py --debug                    # Enable debug mode with verbose logging
+python generate_lineage.py -d
 ```
 
 ## View Lineage

@@ -1,4 +1,4 @@
-sql_folder_path: "example-SQL-tables/"
+sql_folder_path: "example-SQL-tables/batch-3"
 lineage_output: "output/"
 lineage_ui: "ui/"
 file-schema: "playground"
