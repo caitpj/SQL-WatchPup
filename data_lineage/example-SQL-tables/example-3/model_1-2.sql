@@ -1,1 +1,8 @@
-SELECT COUNT(*) FROM TABLE(FLATTEN(input => PARSE_JSON('[1,2,3,4,5]')))
+SELECT COUNT(*) 
+FROM {schema}.model_1-1
+cross JOIN (
+    values ('a', 'b')
+) c(cols)
+cross join lateral (
+    select * from {schema}.model_1-1
+) a
