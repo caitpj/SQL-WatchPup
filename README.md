@@ -1,6 +1,6 @@
 # SQL-WatchPup
 
-A collection of Python tools for SQL data management, with a strong focus on simplicity, flexibility, and speed.
+A collection of Python tools for SQL data management, with a strong focus on simplicity, flexibility, and speed. Each tool works independently, letting you choose only what you need without unnecessary overhead.
 
 ![WatchPup](https://github.com/user-attachments/assets/3d471972-557d-4883-87a5-bd3baf466025)
 
@@ -10,7 +10,7 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 2. Data Lineage Mapper 
 
 ### 1. Data Quality Tester
-- A flexible and extensible data quality testing framework, similar to dbt, without the bloat.
+- A lightweight, non-intrusive data quality testing framework that offers dbt-like functionality for minimum set-up cost.
 - For more details, see README.md in the 'data_quality' folder
 - Output screenshots:
  
@@ -22,7 +22,7 @@ A collection of Python tools for SQL data management, with a strong focus on sim
 
 
 ### 2. Data Lineage Mapper 
-- A Python tool that analyzes SQL files and from it generates an interactive data lineage diagram.
+- Creates interactive data lineage diagrams straight from your SQL files, providing dbt-like visualization for minimum set-up cost.
 - For more details, see README.md in the 'data_lineage' folder
 - Output screenshot:
 
