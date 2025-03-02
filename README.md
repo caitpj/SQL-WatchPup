@@ -1,6 +1,6 @@
 # SQL-WatchPup
 
-A collection of Python tools for SQL data management, with a strong focus on simplicity, flexibility, and speed. Each tool works independently, letting you choose only what you need without unnecessary overhead.
+A collection of command-line tools for SQL data management, with a strong focus on simplicity, flexibility, and speed. Each tool works independently, letting you choose only what you need without unnecessary overhead.
 
 ![WatchPup](https://github.com/user-attachments/assets/3d471972-557d-4883-87a5-bd3baf466025)
 
