@@ -1,0 +1,14 @@
+# run "pip install -r requirements.txt" in the command line
+
+# Core dependencies
+pyyaml>=6.0       # YAML file handling
+jinja2>=3.1.0     # template rendering
+pandas>=2.0.0     # data handling
+termcolor>=2.3.0  # colored terminal output
+
+# Database drivers (uncomment your database type)
+# duckdb>=0.9.0                         # DuckDB
+# psycopg2-binary>=2.9.0                # PostgreSQL
+# sqlalchemy>=2.0.0                     # PostgreSQL via SQLAlchemy
+# trino>=0.327.0                        # Trino
+# snowflake-connector-python>=3.6.0     # Snowflake
