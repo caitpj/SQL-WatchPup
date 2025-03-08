@@ -1,5 +1,5 @@
 # run "pip install -r requirements.txt" in the command line
 
 # Core dependencies
-pyyaml>=6.0       # For YAML file handling
-sqllineage>=1.4.0 # For extracting tables in SQL files
+pyyaml>=6.0         # YAML file handling
+sqlglot>=10.0.0     # extracting tables in SQL files
