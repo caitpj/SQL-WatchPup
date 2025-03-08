@@ -6,7 +6,8 @@ import yaml
 import webbrowser
 from pathlib import Path
 import logging
-from sqllineage.runner import LineageRunner
+import sqlglot
+from sqlglot.expressions import Table
 
 # Define colors for console output
 GREEN = "\033[92m"
@@ -86,65 +87,39 @@ class SQLLineageMapper:
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
-    
+
     def extract_parent_tables(self, sql_content: str, file_path=None):
-        """Extract source tables from SQL using a combination of sqllineage and regex for robustness."""
+        """Extract source tables from SQL using sqlglot."""
         parent_tables = set()
         
         try:
-            # Temporarily replace curly braces with alternatives sqllineage can parse
-            # Replace {schema} with schema_placeholder
-            sql_for_lineage = re.sub(r'\{([^}]+)\}', r'\1_placeholder', sql_content)
+            # Parse SQL statements
+            parsed_expressions = sqlglot.parse(sql_content)
             
-            # Check if the SQL contains any hyphens in identifiers
-            has_hyphens = bool(re.search(r'([a-zA-Z0-9_]+)-([a-zA-Z0-9_]+)', sql_content))
-            
-            # Fix table names with hyphens that sqllineage can't parse
-            sql_for_lineage = re.sub(r'([a-zA-Z0-9_]+)-([a-zA-Z0-9_]+)', r'\1_\2', sql_for_lineage)
-            
-            # Parse with sqllineage
-            lineage = LineageRunner(sql_for_lineage)
-            
-            # Process tables from sqllineage
-            for table in lineage.source_tables:
-                table_str = str(table).lower()
+            # Extract all table references
+            for expression in parsed_expressions:
+                tables = expression.find_all(Table)
                 
-                # Skip SQL functions
-                if any(func == table_str or table_str.endswith(f".{func}") for func in self.sql_functions):
-                    continue
-
-                # Only consider schema-qualified tables
-                if '.' in table_str:
-                    schema, table_name = table_str.split('.')
-                    # Handle placeholder transformations
-                    needs_transform = False
+                for table in tables:
+                    # Get table information
+                    table_name = table.name
+                    schema_name = table.db
                     
-                    # Check for placeholder in schema
-                    if '_placeholder' in schema and '{schema}' in sql_content:
-                        schema = schema.replace('_placeholder', '')
-                        schema = '{' + schema + '}'
-                        needs_transform = True
+                    # Skip if no schema is provided
+                    if not schema_name:
+                        continue
                     
-                    # Check if we need to restore hyphens
-                    if has_hyphens and '_' in table_name:
-                        # First check if this particular table name had hyphens in the original SQL
-                        original_names = re.findall(r'([a-zA-Z0-9_]+)-([a-zA-Z0-9_]+)', sql_content)
-                        for parts in original_names:
-                            joined_with_underscore = f"{parts[0]}_{parts[1]}"
-                            if joined_with_underscore.lower() in table_name.lower():
-                                # Replace the underscore with hyphen in this specific case
-                                table_name = table_name.replace(joined_with_underscore.lower(), f"{parts[0]}-{parts[1]}")
-                                needs_transform = True
-                    
-                    # Add the final transformed or original table name
-                    if needs_transform:
-                        parent_tables.add(f"{schema}.{table_name}")
-                    else:
-                        parent_tables.add(table_str)
+                    # Skip if schema is a SQL function/keyword
+                    if schema_name.lower() in self.sql_functions:
+                        continue
                         
+                    # Construct the qualified table name
+                    qualified_name = f"{schema_name}.{table_name}"
+                    parent_tables.add(qualified_name)
+                    
         except Exception as e:
             if self.debug:
-                self.logger.debug(f"sqllineage parsing failed: {str(e)}")
+                self.logger.debug(f"SQL parsing failed: {str(e)}")
         
         # Log results
         if file_path and self.debug:

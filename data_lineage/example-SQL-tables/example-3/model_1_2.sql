@@ -1,8 +1,8 @@
 SELECT COUNT(*) 
-FROM {schema}.model_1-1
+FROM file_schema.model_1
 cross JOIN (
     values ('a', 'b')
 ) c(cols)
 cross join lateral (
-    select * from {schema}.model_1-1
+    select * from file_schema.model_1_1
 ) a
