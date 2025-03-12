@@ -1,5 +1,5 @@
 with cte_1 as (
-    select * from model_1
+    select * from file_schema.model_1
     where company = 'XXX'
 )
 select 

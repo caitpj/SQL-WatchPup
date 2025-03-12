@@ -1,1 +1,1 @@
-select * from playground.model_5
+select * from file_schema.model_5

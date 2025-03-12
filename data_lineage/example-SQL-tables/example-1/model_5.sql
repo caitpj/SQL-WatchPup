@@ -1,2 +1,2 @@
-select * from playground.model_3
-inner join playground.model_2
+select * from file_schema.model_3
+inner join file_schema.model_2

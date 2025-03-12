@@ -61,7 +61,7 @@ Create a `config.yml` file with the following parameters:
 sql_folder_path: "example-SQL-tables/"   # Path to your SQL files
 lineage_output: "output/"                # Where to output generated files
 lineage_ui: "ui/"                        # Location of UI template files
-file-schema: "playground"                # schema used for SQL file names i.e. {file-schema}.{sql-file-name}
+file-schema: "file_schema"                # schema used for SQL file names i.e. {file-schema}.{sql-file-name}
 ```
 
 ## Options
