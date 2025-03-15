@@ -1,2 +1,2 @@
-with t3_cte as (select * from playground.model_3)
+with t3_cte as (select * from file_schema.model_3)
 select * from t3_cte

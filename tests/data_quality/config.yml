@@ -1,0 +1,5 @@
+table_configs_path: "test_checks/"
+custom_checks_path: "test_checks/custom_checks/"
+db_config:
+  type: duckdb
+  database_file: "data_quality_test.duckdb"

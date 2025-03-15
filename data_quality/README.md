@@ -1,4 +1,4 @@
-# Data Quality Tests
+# Data Quality Checks
 
 A powerful and flexible data quality testing framework that makes it easy to validate your data. Define your tests in YAML, run them with a simple command, and get clear, visual results.
 
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 4. Run your tests:
 ```bash
-python run_dq_tests.py
+python run_dq_checks.py
 ```
 
 For a more detailed walkthrough, check out this article: [dbt Testing Without dbt](https://medium.com/data-engineer-things/dbt-testing-without-dbt-cb184df1fafa
@@ -37,48 +37,42 @@ For a more detailed walkthrough, check out this article: [dbt Testing Without db
 
 The framework uses three types of configuration files:
 
-### 1. Main Configuration (`master_config.yml`)
-This is your central configuration file that points to other config locations:
+### 1. Main Configuration (`config.yml`)
+This is your central configuration file:
 
 ```yaml
-db_config_path: "config/db_details.yml"     # Database connection details
-table_configs_path: "config/tables/"         # Directory containing table test definitions
-custom_tests_path: "custom_tests/"           # Directory for custom SQL tests
-```
+table_configs_path: "checks/"                 # Directory containing table test definitions
+custom_checks_path: "checks/custom_checks/"   # Directory for custom SQL tests
+db_config:
+  # Snowflake
+  type: "snowflake"
+  user: ${SNOWFLAKE_USER}          # Uses environment variables
+  password: ${SNOWFLAKE_PASSWORD}
+  account: ${SNOWFLAKE_ACCOUNT}     # e.g., xy12345.us-east-1
+  warehouse: ${SNOWFLAKE_WAREHOUSE}
+  database: ${SNOWFLAKE_DATABASE}
+  schema: ${SNOWFLAKE_SCHEMA}       # Optional, defaults to PUBLIC
+  role: ${SNOWFLAKE_ROLE}
 
-### 2. Database Configuration (`db_details.yml`)
-Define your database connection details. Examples for supported databases:
+  # DuckDB
+  type: "duckdb"
+  database_file: "path/to/your.duckdb"
 
-```yaml
-# Snowflake
-type: "snowflake"
-user: ${SNOWFLAKE_USER}          # Uses environment variables
-password: ${SNOWFLAKE_PASSWORD}
-account: ${SNOWFLAKE_ACCOUNT}     # e.g., xy12345.us-east-1
-warehouse: ${SNOWFLAKE_WAREHOUSE}
-database: ${SNOWFLAKE_DATABASE}
-schema: ${SNOWFLAKE_SCHEMA}       # Optional, defaults to PUBLIC
-role: ${SNOWFLAKE_ROLE}
+  # PostgreSQL
+  type: "postgresql"
+  host: "localhost"
+  port: "5432"
+  database: "your_database"
+  user: "your_username"
+  password: "your_password"
 
-# DuckDB
-type: "duckdb"
-database_file: "path/to/your.duckdb"
-
-# PostgreSQL
-type: "postgresql"
-host: "localhost"
-port: "5432"
-database: "your_database"
-user: "your_username"
-password: "your_password"
-
-# Trino
-type: "trino"
-host: "localhost"
-port: "8080"
-user: "your_username"
-catalog: "your_catalog"
-schema: "your_schema"  # Optional
+  # Trino
+  type: "trino"
+  host: "localhost"
+  port: "8080"
+  user: "your_username"
+  catalog: "your_catalog"
+  schema: "your_schema"  # Optional
 ```
 
 ### 3. Table Test Configurations
@@ -98,7 +92,7 @@ schema.table_name:
       tests:
         - no_nulls
         - accepted_values: ['active', 'inactive', 'pending']
-        - custom_test_name  # Points to custom_tests/custom_test_name.sql
+        - custom_test_name  # Points to custom_checks/custom_test_name.sql
 ```
 
 ## Built-in Test Types
@@ -110,10 +104,10 @@ schema.table_name:
 
 ## Custom Tests
 
-Create SQL files in your `custom_tests` directory:
+Create SQL files in your `custom_checks` directory:
 
 ```sql
--- custom_tests/positive_amount.sql
+-- custom_checks/positive_amount.sql
 SELECT *
 FROM {{schema}}.{{table_name}}
 WHERE {{column}} <= 0
@@ -128,13 +122,13 @@ The framework uses Jinja templating with these variables:
 
 ```bash
 # Run all tests
-python run_dq_tests.py
+python run_dq_checks.py
 
 # Run tests from specific YAML files
-python run_dq_tests.py --yaml-files users orders
+python run_dq_checks.py --yaml-files users orders
 
 # Run single file
-python run_dq_tests.py --yaml-files users
+python run_dq_checks.py --yaml-files users
 ```
 
 ## Example Output
@@ -170,21 +164,6 @@ schema.users:
    ├─ [████████████████████] 3/3 (100.0%)
    status:
    ├─ [███████████████○○○○○] 1/2 (50.0%)
-```
-
-## Project Structure
-```
-SQL-WatchPup/
-├── config/
-│   ├── db_details.yml          # Database connection details
-│   └── tables/                 # Table test definitions
-│       ├── users.yml
-│       └── orders.yml
-├── custom_tests/               # Custom SQL test files
-│   └── positive_amount.sql
-├── run_dq_tests.py            # Main script
-├── master_config.yml          # Main configuration
-└── requirements.txt           # Python dependencies
 ```
 
 ## Contributing

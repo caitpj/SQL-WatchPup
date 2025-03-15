@@ -1,4 +1,4 @@
-sql_folder_path: "example-SQL-tables/example-3/"
+sql_folder_path: "example-SQL-tables/"
 lineage_output: "output/"
 lineage_ui: "ui/"
 file-schema: "file_schema"
