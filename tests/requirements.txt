@@ -1,0 +1,6 @@
+pyyaml>=6.0         # YAML file handling
+jinja2>=3.1.0       # template rendering
+pandas>=2.0.0       # data handling
+termcolor>=2.3.0    # colored terminal output
+duckdb>=1.0.0       # DuckDB
+sqlglot>=10.0.0     # extracting tables in SQL files
