@@ -41,6 +41,7 @@ class DatabaseConnector(ABC):
         """Return default schema name for this database type"""
         pass
 
+# Update the DuckDBConnector's default_schema property
 class DuckDBConnector(DatabaseConnector):
     def __init__(self):
         self.conn = None
@@ -52,12 +53,48 @@ class DuckDBConnector(DatabaseConnector):
         
     def connect(self, config: Dict[str, Any]):
         logger.info("Connecting to DuckDB...")
-        self.conn = self.duckdb.connect(config['database_file'])
+        db_file = config['database_file']
+        
+        # Get absolute path
+        db_file_abs = os.path.abspath(db_file)
+        logger.info(f"Database file absolute path: {db_file_abs}")
+        
+        # Check if file exists
+        if not os.path.exists(db_file_abs):
+            logger.warning(f"Database file not found at {db_file_abs}")
+            
+            # Option to continue depends on config setting
+            if config.get('require_db_exists', True):
+                raise FileNotFoundError(f"Database file not found: {db_file_abs}")
+            else:
+                logger.warning("Continuing with non-existent database file. DuckDB will create a new empty database.")
+        
+        logger.info(f"Connecting to DuckDB file: {db_file_abs}")
+        self.conn = self.duckdb.connect(db_file_abs)
+        
+        # Test connection by querying schema information
+        try:
+            # Print DuckDB version
+            version = self.conn.execute("SELECT version()").fetchone()[0]
+            logger.info(f"DuckDB version: {version}")
+            
+            # List schemas
+            schemas = self.conn.execute("SELECT schema_name FROM information_schema.schemata").fetchdf()
+            schema_list = schemas['schema_name'].tolist()
+            logger.info(f"Available schemas: {', '.join(schema_list)}")
+        except Exception as e:
+            logger.error(f"Error testing database connection: {str(e)}")
+        
         logger.info("DuckDB connection successful")
         return self
         
     def execute_query(self, query: str) -> pd.DataFrame:
-        return self.conn.execute(query).fetchdf()
+        try:
+            return self.conn.execute(query).fetchdf()
+        except Exception as e:
+            logger.error(f"Error executing query: {query}")
+            logger.error(f"Error details: {str(e)}")
+            raise
         
     def close(self):
         if self.conn:
@@ -65,7 +102,20 @@ class DuckDBConnector(DatabaseConnector):
             
     @property
     def default_schema(self) -> str:
-        return 'main'
+        return ''  # Return empty string to indicate no default schema
+
+# Then update the table identifier parsing method in DataQualityFramework class:
+def _parse_table_identifier(self, table_identifier: str) -> Tuple[str, str]:
+    """Parse schema and table name from table identifier."""
+    parts = table_identifier.split('.')
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    elif self.db.default_schema:
+        return self.db.default_schema, parts[0]
+    else:
+        # No default schema - require fully qualified table names
+        logger.error(f"Table identifier '{table_identifier}' is not fully qualified with schema")
+        raise ValueError(f"Table identifier '{table_identifier}' must include schema (e.g., 'schema.table')")
 
 class PostgresConnector(DatabaseConnector):
     def __init__(self):
@@ -209,7 +259,7 @@ def resolve_path(base_path: str, relative_path: str) -> str:
     """Resolve a path relative to the base path."""
     if os.path.isabs(relative_path):
         return relative_path
-    return os.path.normpath(os.path.join(os.path.dirname(base_path), relative_path))
+    return os.path.normpath(os.path.join(base_path, relative_path))
 
 class DataQualityFramework:
     CONNECTORS = {
@@ -220,25 +270,50 @@ class DataQualityFramework:
         'snowflake': 'SnowflakeConnector'
     }
 
-    def __init__(self, yaml_files: List[str] = None):
+    def __init__(self, yaml_files: List[str] = None, config_path: str = None):
         """Initialize framework with optional specific YAML files to test
         
         Args:
             yaml_files: Optional list of specific YAML files to test
+            config_path: Optional path to the config.yml file
         """
         self.script_path = os.path.abspath(__file__)
         self.yaml_files = yaml_files
-        main_config_path = os.path.join(os.path.dirname(self.script_path), 'config.yml')
+        
+        # Use provided config path or default to config.yml in script directory
+        if config_path:
+            main_config_path = os.path.abspath(config_path)
+            self.config_dir = os.path.dirname(main_config_path)
+            logger.info(f"Using provided config file: {main_config_path}")
+        else:
+            main_config_path = os.path.join(os.path.dirname(self.script_path), 'config.yml')
+            self.config_dir = os.path.dirname(main_config_path)
+            logger.info(f"Using default config file: {main_config_path}")
         
         logger.info(f"Initializing DataQualityFramework")
         if yaml_files:
             logger.info(f"Will only test the following YAML files: {', '.join(yaml_files)}")
         
+        # Load main config
         self.main_config = self._load_yaml(main_config_path)
         
-        # Resolve db_config_path relative to script location
-        db_config_path = resolve_path(self.script_path, self.main_config['db_config_path'])
-        self.db_config = self._load_yaml(db_config_path)
+        # Get db_config directly from main_config
+        self.db_config = self.main_config.get('db_config', {})
+        if not self.db_config:
+            logger.error("Database configuration not found in config.yml")
+            raise ValueError("Database configuration not found in config.yml")
+            
+        # For DuckDB, convert relative database file path to be relative to config directory
+        if self.db_config.get('type', '').lower() in ['duckdb'] and 'database_file' in self.db_config:
+            db_file = self.db_config['database_file']
+            if not os.path.isabs(db_file):
+                self.db_config['database_file'] = os.path.join(self.config_dir, db_file)
+                logger.info(f"Resolved DuckDB database file path: {self.db_config['database_file']}")
+            
+            # Set default for require_db_exists if not specified
+            if 'require_db_exists' not in self.db_config:
+                self.db_config['require_db_exists'] = True
+        
         self.db = self._initialize_db_connector()
         self.custom_tests = self._load_custom_tests()
         self.table_configs = self._load_table_configs()
@@ -300,8 +375,8 @@ class DataQualityFramework:
     def _load_custom_tests(self) -> dict:
         """Load custom test SQL queries from custom_tests directory."""
         custom_tests = {}
-        custom_tests_dir = resolve_path(self.script_path, 
-                                      self.main_config.get('custom_tests_path', 'custom_tests'))
+        custom_tests_dir = resolve_path(self.config_dir, 
+                                      self.main_config.get('custom_checks_path', 'custom_tests'))
         
         logger.info(f"Loading custom tests from: {custom_tests_dir}")
         
@@ -334,7 +409,7 @@ class DataQualityFramework:
         """Load YAML files from the specified config directory.
         If yaml_files is specified, only load those specific files from the config directory."""
         table_configs = {}
-        config_dir = resolve_path(self.script_path, self.main_config['table_configs_path'])
+        config_dir = resolve_path(self.config_dir, self.main_config['table_configs_path'])
         
         logger.info(f"Loading table configs from: {config_dir}")
         
@@ -624,11 +699,16 @@ class DataQualityFramework:
 def main():
     parser = argparse.ArgumentParser(description='Run data quality checks')
     parser.add_argument('--yaml-files', nargs='+', help='Specific YAML files to test from the table_configs_path directory')
+    parser.add_argument('--config', help='Path to the config.yml file (default: ./config.yml)', default=None)
     args = parser.parse_args()
     
     try:
-        logger.info("Loading configuration...")
-        framework = DataQualityFramework(yaml_files=args.yaml_files)
+        if args.config:
+            logger.info(f"Loading configuration from {args.config}...")
+        else:
+            logger.info("Loading configuration from default config.yml...")
+            
+        framework = DataQualityFramework(yaml_files=args.yaml_files, config_path=args.config)
         logger.info("Configuration loaded successfully")
         
         if args.yaml_files:

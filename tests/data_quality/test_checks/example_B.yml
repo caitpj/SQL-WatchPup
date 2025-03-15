@@ -1,0 +1,24 @@
+watchpup.cheese:
+  columns:
+    - name: id
+      tests:
+        - unique
+        - no_nulls
+        - max_len: 20
+
+    - name: status
+      tests:
+        - no_nulls
+        - accepted_values: ['old', 'fresh', 'pending']
+
+watchpup.chess:
+  columns:
+    - name: game_id
+      tests:
+        - unique
+        - no_nulls
+    
+    - name: date
+      tests:
+        - no_nulls
+        - no_future_dates
