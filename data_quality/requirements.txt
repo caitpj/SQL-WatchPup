@@ -7,7 +7,7 @@ pandas>=2.0.0     # data handling
 termcolor>=2.3.0  # colored terminal output
 
 # Database drivers (uncomment your database type)
-# duckdb>=0.9.0                         # DuckDB
+# duckdb>=1.0.0                         # DuckDB
 # psycopg2-binary>=2.9.0                # PostgreSQL
 # sqlalchemy>=2.0.0                     # PostgreSQL via SQLAlchemy
 # trino>=0.327.0                        # Trino
