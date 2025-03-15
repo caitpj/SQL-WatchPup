@@ -1,14 +1,10 @@
 import pytest
 import os
-from unittest.mock import patch, mock_open
 import tempfile
 import yaml
-import re
-
 import sys
-import os
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
 from generate_lineage import SQLLineageMapper
